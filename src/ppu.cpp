@@ -31,7 +31,7 @@ void ppu_init() {
   obuf = new uint32_t[out_width * out_height];
 }
 
-enum class ColourMode { IDX_16, IDX_64, IDX_256, ARGB1555 };
+enum class ColourMode { IDX_4, IDX_16, IDX_64, IDX_256, ARGB1555 };
 
 // Our custom (slow) blitting function
 static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
@@ -51,7 +51,14 @@ static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
         srcptr += 2;
       } else {
         uint8_t raw = 0;
-        if (fmt == ColourMode::IDX_16) {
+        if (fmt == ColourMode::IDX_4) {
+          raw = ((*srcptr) >> src_bit) & 0x03;
+          src_bit += 2;
+          if (src_bit >= 8) {
+            src_bit = 0;
+            srcptr++;
+          }
+        } else if (fmt == ColourMode::IDX_16) {
           raw = ((*srcptr) >> src_bit) & 0x0F;
           src_bit += 4;
           if (src_bit >= 8) {
@@ -143,6 +150,9 @@ static void get_char_data(uint16_t seg, uint16_t vector, int w, int h,
   case ColourMode::IDX_16:
     bpp = 4;
     break;
+  case ColourMode::IDX_4:
+    bpp = 2;
+    break;
   }
   if (bpp == 16)
     spacing *= 8;
@@ -155,7 +165,7 @@ static void get_char_data(uint16_t seg, uint16_t vector, int w, int h,
     buf[i] = read_mem_physical(pa + i);
 }
 
-static void render_sprites(int pal_bank) {
+static void render_sprites() {
   // TODO: lots of rendering fixes, e.g. multi palette blending, sprite per line
   // limit, "dig"
   bool sp_en = get_bit(ppu_regs[reg_sp_ctrl], 2);
@@ -193,6 +203,212 @@ static void render_sprites(int pal_bank) {
       pal1 = (vram + 0x1C00 + 32 * palette);
     vt_blit(sp_width, sp_height, tempbuf, layer_width, layer_height,
             layer_width, x, y, layers[layer], ColourMode::IDX_16, pal0, pal1);
+  }
+}
+
+const int reg_bkg_x[2] = {0x10, 0x14};
+const int reg_bkg_y[2] = {0x11, 0x15};
+const int reg_bkg_ctrl1[2] = {0x12, 0x16};
+
+// const int reg_bkg_linescroll = 0x20;
+const int reg_bkg_ctrl2[2] = {0x13, 0x17};
+
+const int reg_bkg_pal_sel = 0x0F;
+
+const int reg_bkg_seg_lsb[2] = {0x1C, 0x1E};
+const int reg_bkg_seg_msb[2] = {0x1D, 0x1F};
+
+enum BkgScrollMode {
+  SCROLL_FIX = 0,
+  SCROLL_H = 1,
+  SCROLL_V = 2,
+  SCROLL_4P = 3
+};
+
+// Return the address of a tile given index, tile size and scroll mode
+// and whether or not a tile actually exists
+// This needs checking as the datasheet is fairly poor for this
+static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
+                                          int size, bool bmp, int layer,
+                                          BkgScrollMode scrl) {
+  if (size == 8) {
+    uint16_t base = 0;
+    uint16_t offset = ((tx % 32) + 32 * (ty % 32)) * 2;
+    bool mapped = false;
+    switch (scrl) {
+    case SCROLL_FIX:
+      base = (y8 == 0 && x8 == 0) ? 0x000 : 0x800;
+      mapped = (tx < 32 && ty < 32);
+      break;
+    case SCROLL_H:
+      base = ((tx > 32) != x8) ? 0x800 : 0x000;
+      mapped = ty < 32;
+      break;
+    case SCROLL_V:
+      base = ((ty > 32) != y8) ? 0x800 : 0x000;
+      mapped = tx < 32;
+      break;
+    case SCROLL_4P:
+      assert(false);
+      break;
+    }
+    return make_pair(mapped, base + offset);
+  } else if (size == 16) {
+    uint16_t base = 0;
+    uint16_t offset = ((tx % 16) + 16 * (ty % 16)) * 2;
+    bool mapped = false;
+    switch (scrl) {
+    case SCROLL_FIX:
+      base = (layer << 11) | (y8 << 10) | (x8 << 9);
+      mapped = (tx < 16 && ty < 16);
+      break;
+    case SCROLL_H:
+      base = ((tx > 16) != x8) ? 0x200 : 0x000;
+      base |= (layer << 11);
+      mapped = ty < 16;
+      break;
+    case SCROLL_V:
+      base = ((ty > 16) != y8) ? 0x200 : 0x000;
+      base |= (layer << 11);
+      mapped = tx < 16;
+      break;
+    case SCROLL_4P:
+      base = ((tx > 16) != x8) ? 0x200 : 0x000;
+      base |= ((ty > 16) != y8) ? 0x400 : 0x000;
+      base |= (layer << 11);
+      mapped = true;
+      break;
+    }
+    return make_pair(mapped, base + offset);
+  } else if (bmp) {
+    assert(layer == 0);
+    uint16_t base = 0;
+    uint16_t offset = (ty % 256) * 2;
+    bool mapped = false;
+    switch (scrl) {
+    case SCROLL_FIX:
+      base = (layer << 11) | (y8 << 10) | (x8 << 9);
+      mapped = (tx < 1 && ty < 256);
+      break;
+    case SCROLL_H:
+      base = ((tx > 1) != x8) ? 0x200 : 0x000;
+      mapped = ty < 256;
+      break;
+    case SCROLL_V:
+      base = ((ty > 256) != y8) ? 0x200 : 0x000;
+      mapped = tx < 1;
+      break;
+    case SCROLL_4P:
+      base = ((tx > 1) != x8) ? 0x200 : 0x000;
+      base |= ((ty > 256) != y8) ? 0x400 : 0x000;
+      mapped = true;
+      break;
+    }
+    return make_pair(mapped, base + offset);
+  } else {
+    assert(false);
+  }
+}
+
+// Render the given background layer (idx = [0, 1])
+static void render_background(int idx) {
+  bool en = get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 7);
+  if (!en)
+    return;
+  bool bkx_pal = get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 6);
+  ColourMode fmt;
+  bool hclr = (idx == 0) ? get_bit(ppu_regs[reg_bkg_ctrl1[idx]], 4) : false;
+  int bkx_clr = (ppu_regs[reg_bkg_ctrl2[idx]] >> 2) & 0x03;
+  if (hclr) {
+    fmt = ColourMode::ARGB1555;
+  } else {
+    switch (bkx_clr) { // check, datasheet doesn't specify
+    case 0:
+      fmt = ColourMode::IDX_4;
+      break;
+    case 1:
+      fmt = ColourMode::IDX_16;
+      break;
+    case 2:
+      fmt = ColourMode::IDX_64;
+      break;
+    case 3:
+      fmt = ColourMode::IDX_256;
+      break;
+    }
+  }
+  bool x8 = get_bit(ppu_regs[reg_bkg_ctrl1[idx]], 0);
+  bool y8 = get_bit(ppu_regs[reg_bkg_ctrl1[idx]], 1);
+  int xoff = ppu_regs[reg_bkg_x[idx]];
+  if (x8)
+    xoff = xoff - 256;
+  int yoff = ppu_regs[reg_bkg_y[idx]];
+  if (y8)
+    yoff = yoff - 256;
+  bool bmp = (idx == 0) ? get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 1) : false;
+  BkgScrollMode scrl_mode =
+      (BkgScrollMode)((ppu_regs[reg_bkg_ctrl1[idx]] >> 2) & 0x03);
+  // bool line_scroll = get_bit(ppu_regs[reg_bkg_linescroll], 4 + idx);
+  // int line_scroll_bank = ppu_regs[reg_bkg_linescroll] & 0x0F;
+  bool bkx_size = get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 0);
+  int tile_height = bmp ? 1 : (bkx_size ? 16 : 8);
+  int tile_width = bmp ? 256 : (bkx_size ? 16 : 8);
+  int y0 =
+      ((scrl_mode == SCROLL_V || scrl_mode == SCROLL_4P) && !bmp) ? -256 : 0;
+  int x0 =
+      ((scrl_mode == SCROLL_H || scrl_mode == SCROLL_4P) && !bmp) ? -256 : 0;
+  int yn = 256;
+  int xn = 256;
+  uint8_t char_buf[512];
+
+  uint16_t seg = ((ppu_regs[reg_bkg_seg_msb[idx]] & 0x0F) << 8UL) |
+                 ppu_regs[reg_bkg_seg_lsb[idx]];
+
+  for (int y = y0; y < yn; y += tile_height) {
+    for (int x = x0; x < xn; x += tile_width) {
+      int lx = x + xoff;
+      int ly = y + yoff;
+      int tx = (x - x0) / tile_width;
+      int ty = (y - y0) / tile_height;
+      // Various inefficiencies here, should not draw unless at least part
+      // visible
+      auto tile_d =
+          get_tile_addr(tx, ty, y8, x8, tile_width, bmp, idx, scrl_mode);
+      uint16_t tile_addr = tile_d.first;
+      bool tile_mapped = tile_d.second;
+      if (!tile_mapped)
+        continue;
+      uint16_t cell = (vram[tile_addr + 1] << 8UL) | vram[tile_addr];
+      uint16_t vector = cell & 0xFFF;
+      uint8_t cell_pal_bk = (cell >> 12) & 0x0F;
+      if (vector == 0) // transparent
+        continue;
+      uint8_t pal_bank = 0;
+      uint8_t depth = 0;
+      if (bkx_pal) {
+        depth = (ppu_regs[reg_bkg_ctrl2[idx]] >> 4) & 0x03;
+        pal_bank = (fmt == ColourMode::IDX_16)
+                       ? cell_pal_bk
+                       : ((fmt == ColourMode::IDX_64) ? (cell_pal_bk >> 2) : 0);
+      } else {
+        depth = cell_pal_bk & 0x03;
+        pal_bank = (fmt == ColourMode::IDX_16)
+                       ? (((ppu_regs[reg_bkg_ctrl2[idx]] >> 4) & 0x03) |
+                          (cell_pal_bk >> 2))
+                       : ((fmt == ColourMode::IDX_64) ? (cell_pal_bk >> 2) : 0);
+      }
+      get_char_data(seg, vector, tile_width, tile_height, fmt, bmp, char_buf);
+      // TODO: line scrolling
+      uint16_t palette_offset =
+          (fmt == ColourMode::IDX_16)
+              ? (pal_bank * 32)
+              : (fmt == ColourMode::IDX_64 ? (pal_bank * 128) : 0);
+      uint8_t *pal0, *pal1;
+      pal0 = (vram + 0x1E00 + palette_offset);
+      pal1 = (vram + 0x1C00 + palette_offset);
+      vt_blit(tile_width, tile_height, char_buf, layer_width, layer_height,
+              layer_width, lx, ly, layers[depth & 0x03], fmt, pal0, pal1);
+    }
   }
 }
 
