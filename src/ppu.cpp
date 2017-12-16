@@ -2,9 +2,17 @@
 #include "mmu.hpp"
 #include "util.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cassert>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 namespace VTxx {
+
 static uint8_t ppu_regs[256];
+static uint8_t ppu_regs_shadow[256];
+static mutex regs_mutex;
+
 static uint8_t vram[4096];
 static uint8_t spram[2048];
 
@@ -16,6 +24,7 @@ static uint8_t spram[2048];
 static uint32_t *layers[4];
 static int layer_width, layer_height;
 
+// Output buffer in ARGB8888 format
 static uint32_t *obuf;
 static int out_width, out_height;
 
@@ -119,10 +128,6 @@ static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
   }
 };
 
-void clear_layer(uint16_t *ptr, int w, int h) {
-  fill(ptr, ptr + (w * h), 0x8000); // fill with transparent
-}
-
 const int reg_sp_seg_lsb = 0x1A;
 const int reg_sp_seg_msb = 0x1B;
 const int reg_sp_ctrl = 0x18;
@@ -168,19 +173,19 @@ static void get_char_data(uint16_t seg, uint16_t vector, int w, int h,
 static void render_sprites() {
   // TODO: lots of rendering fixes, e.g. multi palette blending, sprite per line
   // limit, "dig"
-  bool sp_en = get_bit(ppu_regs[reg_sp_ctrl], 2);
+  bool sp_en = get_bit(ppu_regs_shadow[reg_sp_ctrl], 2);
   if (!sp_en)
     return;
-  bool spalsel = get_bit(ppu_regs[reg_sp_ctrl], 3);
-  int sp_size = ppu_regs[reg_sp_ctrl] & 0x03;
+  bool spalsel = get_bit(ppu_regs_shadow[reg_sp_ctrl], 3);
+  int sp_size = ppu_regs_shadow[reg_sp_ctrl] & 0x03;
   int sp_width = (sp_size == 2 || sp_size == 3) ? 16 : 8;
   int sp_height = (sp_size == 1 || sp_size == 3) ? 16 : 8;
-  uint16_t sp_seg =
-      (ppu_regs[reg_sp_seg_msb] & 0x0F) << 8 | ppu_regs[reg_sp_seg_lsb];
+  uint16_t sp_seg = (ppu_regs_shadow[reg_sp_seg_msb] & 0x0F) << 8 |
+                    ppu_regs_shadow[reg_sp_seg_lsb];
 
   uint8_t tempbuf[16 * 16];
 
-  for (int idx = 0; idx < 240; idx++) {
+  for (int idx = 239; idx >= 0; idx--) {
     uint8_t *spdata = spram + 8 * idx;
     uint16_t vector = ((spdata[1] & 0x0F) << 8UL) | spdata[0];
     if (vector == 0)
@@ -312,13 +317,14 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
 
 // Render the given background layer (idx = [0, 1])
 static void render_background(int idx) {
-  bool en = get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 7);
+  bool en = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 7);
   if (!en)
     return;
-  bool bkx_pal = get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 6);
+  bool bkx_pal = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 6);
   ColourMode fmt;
-  bool hclr = (idx == 0) ? get_bit(ppu_regs[reg_bkg_ctrl1[idx]], 4) : false;
-  int bkx_clr = (ppu_regs[reg_bkg_ctrl2[idx]] >> 2) & 0x03;
+  bool hclr =
+      (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl1[idx]], 4) : false;
+  int bkx_clr = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 2) & 0x03;
   if (hclr) {
     fmt = ColourMode::ARGB1555;
   } else {
@@ -337,20 +343,24 @@ static void render_background(int idx) {
       break;
     }
   }
-  bool x8 = get_bit(ppu_regs[reg_bkg_ctrl1[idx]], 0);
-  bool y8 = get_bit(ppu_regs[reg_bkg_ctrl1[idx]], 1);
-  int xoff = ppu_regs[reg_bkg_x[idx]];
+  bool x8 = get_bit(ppu_regs_shadow[reg_bkg_ctrl1[idx]], 0);
+  bool y8 = get_bit(ppu_regs_shadow[reg_bkg_ctrl1[idx]], 1);
+  bool render_pal0 = get_bit(ppu_regs_shadow[reg_bkg_pal_sel], 0 + 2 * idx);
+  bool render_pal1 = get_bit(ppu_regs_shadow[reg_bkg_pal_sel], 1 + 2 * idx);
+
+  int xoff = ppu_regs_shadow[reg_bkg_x[idx]];
   if (x8)
     xoff = xoff - 256;
-  int yoff = ppu_regs[reg_bkg_y[idx]];
+  int yoff = ppu_regs_shadow[reg_bkg_y[idx]];
   if (y8)
     yoff = yoff - 256;
-  bool bmp = (idx == 0) ? get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 1) : false;
+  bool bmp =
+      (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
   BkgScrollMode scrl_mode =
-      (BkgScrollMode)((ppu_regs[reg_bkg_ctrl1[idx]] >> 2) & 0x03);
-  // bool line_scroll = get_bit(ppu_regs[reg_bkg_linescroll], 4 + idx);
-  // int line_scroll_bank = ppu_regs[reg_bkg_linescroll] & 0x0F;
-  bool bkx_size = get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 0);
+      (BkgScrollMode)((ppu_regs_shadow[reg_bkg_ctrl1[idx]] >> 2) & 0x03);
+  // bool line_scroll = get_bit(ppu_regs_shadow[reg_bkg_linescroll], 4 + idx);
+  // int line_scroll_bank = ppu_regs_shadow[reg_bkg_linescroll] & 0x0F;
+  bool bkx_size = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 0);
   int tile_height = bmp ? 1 : (bkx_size ? 16 : 8);
   int tile_width = bmp ? 256 : (bkx_size ? 16 : 8);
   int y0 =
@@ -361,8 +371,8 @@ static void render_background(int idx) {
   int xn = 256;
   uint8_t char_buf[512];
 
-  uint16_t seg = ((ppu_regs[reg_bkg_seg_msb[idx]] & 0x0F) << 8UL) |
-                 ppu_regs[reg_bkg_seg_lsb[idx]];
+  uint16_t seg = ((ppu_regs_shadow[reg_bkg_seg_msb[idx]] & 0x0F) << 8UL) |
+                 ppu_regs_shadow[reg_bkg_seg_lsb[idx]];
 
   for (int y = y0; y < yn; y += tile_height) {
     for (int x = x0; x < xn; x += tile_width) {
@@ -386,14 +396,14 @@ static void render_background(int idx) {
       uint8_t pal_bank = 0;
       uint8_t depth = 0;
       if (bkx_pal) {
-        depth = (ppu_regs[reg_bkg_ctrl2[idx]] >> 4) & 0x03;
+        depth = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 4) & 0x03;
         pal_bank = (fmt == ColourMode::IDX_16)
                        ? cell_pal_bk
                        : ((fmt == ColourMode::IDX_64) ? (cell_pal_bk >> 2) : 0);
       } else {
         depth = cell_pal_bk & 0x03;
         pal_bank = (fmt == ColourMode::IDX_16)
-                       ? (((ppu_regs[reg_bkg_ctrl2[idx]] >> 4) & 0x03) |
+                       ? (((ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 4) & 0x03) |
                           (cell_pal_bk >> 2))
                        : ((fmt == ColourMode::IDX_64) ? (cell_pal_bk >> 2) : 0);
       }
@@ -403,13 +413,166 @@ static void render_background(int idx) {
           (fmt == ColourMode::IDX_16)
               ? (pal_bank * 32)
               : (fmt == ColourMode::IDX_64 ? (pal_bank * 128) : 0);
-      uint8_t *pal0, *pal1;
-      pal0 = (vram + 0x1E00 + palette_offset);
-      pal1 = (vram + 0x1C00 + palette_offset);
+      uint8_t *pal0 = nullptr, *pal1 = nullptr;
+      if (render_pal0)
+        pal0 = (vram + 0x1E00 + palette_offset);
+      if (render_pal1)
+        pal1 = (vram + 0x1C00 + palette_offset);
       vt_blit(tile_width, tile_height, char_buf, layer_width, layer_height,
               layer_width, lx, ly, layers[depth & 0x03], fmt, pal0, pal1);
     }
   }
+}
+
+const int reg_pal_sel = 0x0E;
+// const int reg_v_scale = 0x19;
+static inline uint16_t blend_argb1555(uint16_t a, uint16_t b) {
+  if (a & 0x8000)
+    return b;
+  if (b & 0x8000)
+    return a;
+  uint16_t x = 0;
+  x |= (((a & 0x1F) + (b & 0x1F)) / 2) & 0x1F;
+  x |= (((((a >> 5) & 0x1F) + ((b >> 5) & 0x1)) / 2) & 0x1F) << 5;
+  x |= (((((a >> 11) & 0x1F) + ((b >> 11) & 0x1F)) / 2) & 0x1F) << 10;
+  return x;
+}
+
+static inline uint8_t c5_to_8(uint8_t x) {
+  bool lsb = get_bit(x, 0);
+  return (x << 3) | (lsb ? 0x7 : 0x0);
+}
+
+static inline uint32_t argb1555_to_rgb8888(uint16_t x) {
+  uint8_t r = x & 0x1F;
+  uint8_t g = (x >> 5) & 0x1F;
+  uint8_t b = (x >> 10) & 0x1F;
+  bool a = get_bit(x, 15);
+  uint32_t y = 0;
+  y |= a ? 0x00000000 : 0xFF000000;
+  y |= c5_to_8(r) << 16UL;
+  y |= c5_to_8(g) << 8UL;
+  y |= c5_to_8(b);
+  return y;
+}
+
+// Merge the layers and convert to ARGB8888. Set lcd to true to merge for LCD
+// rather than TV output
+static void merge_layers(bool lcd = false) {
+  bool output_pal0 = get_bit(ppu_regs_shadow[reg_pal_sel], lcd ? 0 : 1);
+  bool output_pal1 = get_bit(ppu_regs_shadow[reg_pal_sel], lcd ? 2 : 3);
+  bool blend_pal = get_bit(ppu_regs_shadow[reg_pal_sel], lcd ? 5 : 4);
+  for (int y = 0; y < out_height; y++) {
+    for (int x = 0; x < out_width; x++) {
+      uint16_t pal0 = 0x8000, pal1 = 0x8000;
+      for (int l = 3; l >= 0; l--) {
+        uint32_t raw = layers[l][y * layer_width + x];
+        if (!(raw & 0x8000)) {
+          pal0 = raw & 0xFFFF;
+        }
+        if (!(raw & 0x80000000)) {
+          pal1 = (raw >> 16) & 0xFFFF;
+        }
+        uint16_t res = 0x8000;
+        if (blend_pal && output_pal0 && output_pal1) {
+          res = blend_argb1555(pal0, pal1);
+        }
+        if (output_pal0 && !(pal0 & 0x8000)) {
+          res = pal0;
+        }
+        if (output_pal1 && !(pal1 & 0x8000)) {
+          res = pal1;
+        }
+        obuf[y * out_width + x] = argb1555_to_rgb8888(res);
+      }
+    }
+  }
+}
+
+static void clear_layer(uint32_t *ptr, int w, int h) {
+  fill(ptr, ptr + (w * h), 0x80008000); // fill with transparent
+}
+
+static void clear_layers() {
+  for (int i = 0; i < 4; i++)
+    clear_layer(layers[i], layer_width, layer_height);
+}
+
+static atomic<bool> render_done(false);
+
+// Render and merge all layers
+static void do_render() {
+  render_done = false;
+  // Make a shadow copy of the PPU registers for thread safety - the CPU
+  // shouldn't really be accessing them though anyway
+  {
+    lock_guard<std::mutex> guard(regs_mutex);
+    copy(ppu_regs, ppu_regs + 256, ppu_regs_shadow);
+  }
+  // Fill all layers with transparent
+  clear_layers();
+  // Render background layers (lower index has priority)
+  for (int i = 1; i >= 0; i--)
+    render_background(i);
+  // Render sprites
+  render_sprites();
+  // Merge to output
+  merge_layers(false);
+  render_done = true;
+};
+
+static atomic<bool> kill_renderer(false);
+static bool render_ready = false;
+static condition_variable do_render_cv;
+static mutex do_render_m;
+
+void ppu_render_thread() {
+  while (!kill_renderer) {
+    std::unique_lock<std::mutex> lk(do_render_m);
+    do_render_cv.wait(lk, [] { return render_ready; });
+    render_ready = false;
+    // Signal might be to die rather than render again
+    if (!kill_renderer) {
+      do_render();
+    }
+    lk.unlock();
+  }
+}
+// Defaults to PAL
+static uint32_t vblank_start = 0;
+static uint32_t vblank_len = 22036;
+static uint32_t v_total = 106392;
+
+static uint32_t ticks = 0;
+// Called once every CPU clock
+void ppu_tick() {
+  ticks += 1;
+  if (ticks >= v_total) {
+    ticks = 0;
+    // TODO: signal vblank NMI
+  } else if (ticks == vblank_len) {
+    // Render begins at end of VBLANK
+    {
+      lock_guard<mutex> lk(do_render_m);
+      render_ready = true;
+    }
+    do_render_cv.notify_one();
+  }
+}
+
+bool ppu_is_render_done() { return render_done; }
+
+bool ppu_is_vblank() { return (ticks >= vblank_start && ticks < vblank_len); }
+
+uint32_t *get_render_buffer() { return obuf; }
+
+void ppu_stop() {
+  {
+    lock_guard<mutex> lk(do_render_m);
+    render_ready = true;
+    kill_renderer = true;
+  }
+  do_render_cv.notify_one();
 }
 
 } // namespace VTxx
