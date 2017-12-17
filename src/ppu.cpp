@@ -9,12 +9,12 @@
 #include <thread>
 namespace VTxx {
 
-static uint8_t ppu_regs[256];
+static volatile uint8_t ppu_regs[256];
 static uint8_t ppu_regs_shadow[256];
 static mutex regs_mutex;
 
-static uint8_t vram[4096];
-static uint8_t spram[2048];
+static volatile uint8_t vram[8192];
+static volatile uint8_t spram[2048];
 
 // Graphics layers
 // These use a *very* unusual format to match - at least as close as possible -
@@ -45,8 +45,9 @@ enum class ColourMode { IDX_4, IDX_16, IDX_64, IDX_256, ARGB1555 };
 // Our custom (slow) blitting function
 static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
                     int dst_height, int dst_stride, int dst_x, int dst_y,
-                    uint32_t *dst, ColourMode fmt, uint8_t *pal0 = nullptr,
-                    uint8_t *pal1 = nullptr) {
+                    uint32_t *dst, ColourMode fmt,
+                    volatile uint8_t *pal0 = nullptr,
+                    volatile uint8_t *pal1 = nullptr) {
   uint8_t *srcptr = src;
   int src_bit = 0;
   for (int sy = 0; sy < src_height; sy++) {
@@ -186,7 +187,7 @@ static void render_sprites() {
   uint8_t tempbuf[16 * 16];
 
   for (int idx = 239; idx >= 0; idx--) {
-    uint8_t *spdata = spram + 8 * idx;
+    volatile uint8_t *spdata = spram + 8 * idx;
     uint16_t vector = ((spdata[1] & 0x0F) << 8UL) | spdata[0];
     if (vector == 0)
       continue;
@@ -201,7 +202,7 @@ static void render_sprites() {
       y = y - 256;
     get_char_data(sp_seg, vector, sp_width, sp_height, ColourMode::IDX_16,
                   false, tempbuf);
-    uint8_t *pal0 = nullptr, *pal1 = nullptr;
+    volatile uint8_t *pal0 = nullptr, *pal1 = nullptr;
     if (spalsel || !psel)
       pal0 = (vram + 0x1E00 + 32 * palette);
     if (spalsel || psel)
@@ -413,7 +414,7 @@ static void render_background(int idx) {
           (fmt == ColourMode::IDX_16)
               ? (pal_bank * 32)
               : (fmt == ColourMode::IDX_64 ? (pal_bank * 128) : 0);
-      uint8_t *pal0 = nullptr, *pal1 = nullptr;
+      volatile uint8_t *pal0 = nullptr, *pal1 = nullptr;
       if (render_pal0)
         pal0 = (vram + 0x1E00 + palette_offset);
       if (render_pal1)
@@ -575,4 +576,59 @@ void ppu_stop() {
   do_render_cv.notify_one();
 }
 
+const uint8_t reg_ppu_stat = 0x01;
+
+const uint8_t reg_spram_addr_msb = 0x02;
+const uint8_t reg_spram_addr_lsb = 0x03;
+const uint8_t reg_spram_data = 0x04;
+
+const uint8_t reg_vram_addr_msb = 0x06;
+const uint8_t reg_vram_addr_lsb = 0x05;
+const uint8_t reg_vram_data = 0x07;
+
+uint8_t ppu_read(uint8_t address) {
+  switch (address) {
+  case reg_spram_data: {
+    uint16_t spram_addr = ((ppu_regs[reg_spram_addr_msb] & 0x07) << 8) |
+                          ppu_regs[reg_spram_addr_lsb];
+    return spram[spram_addr]; // TODO: are SPRAM and VRAM reads swapped?
+  }
+  case reg_vram_data: {
+    uint16_t vram_addr = ((ppu_regs[reg_vram_addr_msb] & 0x1F) << 8) |
+                         ppu_regs[reg_vram_addr_lsb];
+    return vram[vram_addr]; // TODO: are SPRAM and VRAM reads swapped?
+  }
+  case reg_ppu_stat: {
+    // Clear VBLANK IRQ here
+    return (ppu_is_vblank() << 7);
+  }
+  default:
+    return ppu_regs[address];
+  }
+}
+
+void ppu_write(uint8_t address, uint8_t data) {
+  switch (address) {
+  case reg_spram_data: {
+    uint16_t spram_addr = ((ppu_regs[reg_spram_addr_msb] & 0x07) << 8) |
+                          ppu_regs[reg_spram_addr_lsb];
+    spram[spram_addr++] = data;
+    if ((spram_addr & 0x07) >= 6) { // TODO: check, is this just for DMA?
+      spram_addr &= ~0x07;
+      spram_addr += 8;
+    }
+    ppu_regs[reg_spram_addr_msb] = (spram_addr >> 8) & 0x07;
+    ppu_regs[reg_spram_addr_lsb] = spram_addr & 0xFF;
+  }
+  case reg_vram_data: {
+    uint16_t vram_addr = ((ppu_regs[reg_vram_addr_msb] & 0x1F) << 8) |
+                         ppu_regs[reg_vram_addr_lsb];
+    vram[vram_addr++] = data;
+    ppu_regs[reg_vram_addr_msb] = (vram_addr >> 8) & 0x1F;
+    ppu_regs[reg_vram_addr_lsb] = vram_addr & 0xFF;
+  }
+  default:
+    ppu_regs[address] = data;
+  }
+}
 } // namespace VTxx
