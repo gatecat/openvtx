@@ -1,13 +1,10 @@
 #ifndef TIMER_H
 #define TIMER_H
-
+#include "typedefs.hpp"
 #include <cstdint>
 
 namespace VTxx {
 enum class TimerType { TIMER_VT_CPU, TIMER_VT_SCPU };
-
-// Timer IRQ callback - 1 signals IRQ fire and 0 signals IRQ clear
-typedef void (*TimerCallback)(bool status);
 
 class Timer {
 public:

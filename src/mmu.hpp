@@ -1,5 +1,6 @@
 #ifndef MMU_H
 #define MMU_H
+#include "typedefs.hpp"
 #include <cstdint>
 #include <string>
 using namespace std;
@@ -17,11 +18,6 @@ void write_mem_virtual(uint16_t addr, uint8_t data);
 
 uint8_t read_mem_physical(uint32_t addr);
 void write_mem_physical(uint32_t addr, uint8_t data);
-
-// Some control registers have special handlers for read or write
-// These are the types for these
-typedef uint8_t (*ReadHandler)(uint16_t addr);
-typedef void (*WriteHandler)(uint16_t addr, uint8_t value);
 
 // Custom read and write overrides for control registers
 // Set to nullptr if just a plain register
