@@ -159,5 +159,8 @@ public:
   uint16_t rstVectorL = 0xFFFC;
   uint16_t nmiVectorH = 0xFFFB;
   uint16_t nmiVectorL = 0xFFFA;
+
+  // MiWi2 style scrambling
+  bool scramble = false;
 };
 } // namespace mos6502

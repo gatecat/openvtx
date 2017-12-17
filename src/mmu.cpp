@@ -2,6 +2,9 @@
 #include "ppu.hpp"
 #include "util.hpp"
 #include <cassert>
+#include <fstream>
+#include <iostream>
+
 using namespace std;
 
 namespace VTxx {
@@ -13,6 +16,21 @@ static uint8_t rom[32 * 1024 * 1024];
 
 ReadHandler reg_read_fn[256] = {nullptr};
 WriteHandler reg_write_fn[256] = {nullptr};
+
+void mmu_init() {
+  // TODO: default paging values?
+}
+
+void load_rom(const string &filename) {
+  ifstream romf(filename);
+  if (!romf) {
+    cerr << "Failed to load ROM" << endl;
+    assert(false);
+  }
+  romf.read(rom, sizeof(rom));
+  size_t romsize = romf.gcount();
+  cout << "Loaded ROM, size = " << (romsize / 1024) << "KB" << endl;
+}
 
 const int reg_prg_bank1_reg3 = 0x00;
 const int reg_prg_bank0_reg0 = 0x07;

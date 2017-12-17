@@ -12,7 +12,7 @@ void Timer::write(uint8_t addr, uint8_t data) {
       preload &= 0xFF00;
       preload |= data;
       break;
-    case 0x4:
+    case 0x3:
       preload &= 0x00FF;
       preload |= (data << 8UL);
       break;
@@ -56,7 +56,7 @@ uint8_t Timer::read(uint8_t addr) {
     switch (addr) {
     case 0x0:
       return preload & 0xFF;
-    case 0x4:
+    case 0x3:
       return (preload >> 8) & 0xFF;
     case 0x1:
       return config;

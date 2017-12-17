@@ -1,5 +1,5 @@
-#ifndef SCPU_H
-#define SCPU_H
+#ifndef SCPU_MEM_H
+#define SCPU_MEM_H
 #include "typedefs.hpp"
 #include <cstdint>
 using namespace std;
@@ -17,4 +17,4 @@ extern WriteHandler scpu_reg_write_fn[256];
 
 } // namespace VTxx
 
-#endif /* end of include guard: SCPU_H */
+#endif /* end of include guard: SCPU_MEM_H */

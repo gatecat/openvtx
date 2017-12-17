@@ -3,6 +3,11 @@
 #include <cassert>
 
 namespace VTxx {
+
+uint8_t scpu_control_reg[256] = {0};
+ReadHandler scpu_reg_read_fn[256];
+WriteHandler scpu_reg_write_fn[256];
+
 uint8_t scpu_read_mem(uint16_t addr) {
   if ((addr >= 0 && addr < 0x1000) || (addr >= 0x1000 && addr < 0x2000)) {
     uint16_t mem_addr = addr & 0x0FFF;
