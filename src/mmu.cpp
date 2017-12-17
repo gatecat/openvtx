@@ -1,4 +1,5 @@
 #include "mmu.hpp"
+#include "ppu.hpp"
 #include "util.hpp"
 #include <cassert>
 using namespace std;
@@ -147,8 +148,7 @@ uint8_t read_mem_virtual(uint16_t addr) {
   } else if (addr >= 0x4000) {
     return rom[decode_address(addr)];
   } else if (addr >= 0x2000 && addr <= 0x20FF) {
-    // PPU read, NYI
-    assert(false);
+    return ppu_read(addr & 0xFF);
   } else if (addr >= 0x2100 && addr <= 0x21FF) {
     // System regs read
     uint8_t reg_addr = addr & 0xFF;
@@ -177,8 +177,7 @@ void write_mem_virtual(uint16_t addr, uint8_t data) {
     rom[decode_address(addr)] =
         data; // Seems odd but "ROM" might actually be extram
   } else if (addr >= 0x2000 && addr <= 0x20FF) {
-    // PPU write, NYI
-    assert(false);
+    ppu_write(addr & 0xFF, data);
   } else if (addr >= 0x2100 && addr <= 0x21FF) {
     uint8_t reg_addr = addr & 0xFF;
     if (reg_write_fn[reg_addr] != nullptr)
