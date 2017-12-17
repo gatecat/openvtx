@@ -1,5 +1,5 @@
 
-#include "mos6502.h"
+#include "mos6502.hpp"
 namespace mos6502 {
 
 #define NEGATIVE 0x80
