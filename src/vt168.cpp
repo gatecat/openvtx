@@ -2,6 +2,7 @@
 #include "6502/mos6502.hpp"
 #include "dma.hpp"
 #include "extalu.hpp"
+#include "input.hpp"
 #include "irq.hpp"
 #include "mmu.hpp"
 #include "ppu.hpp"
@@ -22,6 +23,8 @@ static Timer *cpu_timer, *scpu_timer0, *scpu_timer1;
 static IRQController *cpu_irq, *scpu_irq;
 
 static DMACtrl *cpu_dma;
+
+static InputDev *inp;
 
 static const vector<IRQVector> cpu_vectors = {
     {0xFFFF, 0xFFFE}, // 0 EXT
@@ -113,6 +116,9 @@ void vt168_init(VT168_Platform plat, const std::string &rom) {
     };
   }
 
+  inp = new InputDev();
+  reg_read_fn[0x29] = [](uint16_t a) { return inp->read(0); };
+
   // TODO: init misc control regs
 
   cpu->Reset();
@@ -172,5 +178,7 @@ bool vt168_tick() {
   }
   return is_vblank;
 }
+
+void vt168_process_event(SDL_Event *ev) { inp->process_event(ev); }
 
 }; // namespace VTxx

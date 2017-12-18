@@ -52,6 +52,7 @@ int main(int argc, const char *argv[]) {
           return 0;
           break;
         }
+        vt168_process_event(&event);
       }
       // Render graphics
       SDL_Surface *surf = SDL_CreateRGBSurfaceFrom(

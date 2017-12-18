@@ -9,7 +9,7 @@ using namespace std;
 
 namespace VTxx {
 
-uint8_t control_reg[256];
+uint8_t control_reg[256] = {0};
 uint8_t cpu_ram[8192];
 
 static uint8_t rom[32 * 1024 * 1024];

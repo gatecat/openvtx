@@ -1,7 +1,7 @@
 src = $(wildcard src/*.cpp src/6502/*.cpp)
 obj = $(src:.cpp=.o)
 
-CXXFLAGS = -std=c++11 -g 
+CXXFLAGS = -std=c++11 -g -O3
 LDFLAGS = -lSDL2 -lpthread
 all: openvtx
 

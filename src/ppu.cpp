@@ -11,12 +11,12 @@
 
 namespace VTxx {
 
-static volatile uint8_t ppu_regs[256];
-static uint8_t ppu_regs_shadow[256];
+static volatile uint8_t ppu_regs[256] = {0};
+static uint8_t ppu_regs_shadow[256] = {0};
 static mutex regs_mutex;
 
-static volatile uint8_t vram[8192];
-static volatile uint8_t spram[2048];
+static volatile uint8_t vram[8192] = {0};
+static volatile uint8_t spram[2048] = {0};
 
 // Graphics layers
 // These use a *very* unusual format to match - at least as close as possible -
@@ -347,7 +347,7 @@ static void render_background(int idx) {
   int yoff = unsigned(ppu_regs_shadow[reg_bkg_y[idx]]);
   if (y8)
     yoff = yoff - 256;
-  cout << "BKG" << idx << " loc " << xoff << " " << yoff << endl;
+  // cout << "BKG" << idx << " loc " << xoff << " " << yoff << endl;
 
   bool bmp =
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
@@ -606,7 +606,7 @@ uint8_t ppu_read(uint8_t address) {
   case reg_vram_data: {
     uint16_t vram_addr = ((ppu_regs[reg_vram_addr_msb] & 0x1F) << 8) |
                          ppu_regs[reg_vram_addr_lsb];
-    cout << "vram rd " << hex << vram_addr;
+    // cout << "vram rd " << hex << vram_addr;
     return vram[vram_addr]; // TODO: are SPRAM and VRAM reads
                             // swapped?
   }
@@ -636,7 +636,7 @@ void ppu_write(uint8_t address, uint8_t data) {
   case reg_vram_data: {
     uint16_t vram_addr = ((ppu_regs[reg_vram_addr_msb] & 0x1F) << 8) |
                          ppu_regs[reg_vram_addr_lsb];
-    cout << "vram wr " << hex << vram_addr << " d=" << int(data) << endl;
+    // cout << "vram wr " << hex << vram_addr << " d=" << int(data) << endl;
     vram[vram_addr++] = data;
     ppu_regs[reg_vram_addr_msb] = (vram_addr >> 8) & 0x1F;
     ppu_regs[reg_vram_addr_lsb] = vram_addr & 0xFF;
@@ -646,9 +646,9 @@ void ppu_write(uint8_t address, uint8_t data) {
 
     ppu_regs[address] = data;
     if (address == reg_vram_addr_msb || address == reg_vram_addr_lsb) {
-      cout << "vram set addr 0x" << hex
+      /*cout << "vram set addr 0x" << hex
            << ((ppu_regs[reg_vram_addr_msb] << 8) | ppu_regs[reg_vram_addr_lsb])
-           << endl;
+           << endl;*/
     }
     break;
   }
