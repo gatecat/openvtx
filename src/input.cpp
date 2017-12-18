@@ -1,6 +1,7 @@
 #include "input.hpp"
 #include "SDL2/SDL.h"
 #include <cassert>
+#include <iostream>
 #include <map>
 #include <vector>
 using namespace std;
@@ -10,6 +11,7 @@ namespace VTxx {
 void InputDev::write(uint8_t addr, uint8_t data) { assert(false); }
 
 uint8_t InputDev::read(uint8_t addr) {
+  cout << "input_rd" << endl;
   uint8_t res = shiftreg & 0x01;
   shiftreg >>= 1;
   shiftreg |= ((btn_state & 0x01) << 7);
@@ -25,11 +27,13 @@ void InputDev::process_event(SDL_Event *ev) {
   switch (ev->type) {
   case SDL_KEYDOWN:
     if (keys.find(ev->key.keysym.scancode) != keys.end()) {
+      cout << "keydown " << keys.at(ev->key.keysym.scancode) << endl;
       btn_state |= (1 << keys.at(ev->key.keysym.scancode));
     }
     break;
   case SDL_KEYUP:
     if (keys.find(ev->key.keysym.scancode) != keys.end()) {
+      cout << "keyup " << keys.at(ev->key.keysym.scancode) << endl;
       btn_state &= ~(1 << keys.at(ev->key.keysym.scancode));
     }
     break;
