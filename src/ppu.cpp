@@ -186,10 +186,10 @@ static void render_sprites() {
     int layer = (spdata[3] >> 3) & 0x03;
     int palette = (spdata[1] >> 4) & 0x0F;
     bool psel = get_bit(spdata[5], 1);
-    int x = spdata[2];
+    int x = unsigned(spdata[2]);
     if (get_bit(spdata[3], 0))
       x = x - 256;
-    int y = spdata[4];
+    int y = unsigned(spdata[4]);
     if (get_bit(spdata[5], 0))
       y = y - 256;
     get_char_data(sp_seg, vector, sp_width, sp_height, ColourMode::IDX_16,
@@ -250,7 +250,7 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
       assert(false);
       break;
     }
-    return make_pair(mapped, base + offset);
+    return make_pair(base + offset, mapped);
   } else if (size == 16) {
     uint16_t base = 0;
     uint16_t offset = ((tx % 16) + 16 * (ty % 16)) * 2;
@@ -277,7 +277,7 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
       mapped = true;
       break;
     }
-    return make_pair(mapped, base + offset);
+    return make_pair(base + offset, mapped);
   } else if (bmp) {
     assert(layer == 0);
     uint16_t base = 0;
@@ -302,7 +302,7 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
       mapped = true;
       break;
     }
-    return make_pair(mapped, base + offset);
+    return make_pair(base + offset, mapped);
   } else {
     assert(false);
   }
@@ -341,12 +341,14 @@ static void render_background(int idx) {
   bool render_pal0 = get_bit(ppu_regs_shadow[reg_bkg_pal_sel], 0 + 2 * idx);
   bool render_pal1 = get_bit(ppu_regs_shadow[reg_bkg_pal_sel], 1 + 2 * idx);
 
-  int xoff = ppu_regs_shadow[reg_bkg_x[idx]];
+  int xoff = unsigned(ppu_regs_shadow[reg_bkg_x[idx]]);
   if (x8)
     xoff = xoff - 256;
-  int yoff = ppu_regs_shadow[reg_bkg_y[idx]];
+  int yoff = unsigned(ppu_regs_shadow[reg_bkg_y[idx]]);
   if (y8)
     yoff = yoff - 256;
+  cout << "BKG" << idx << " loc " << xoff << " " << yoff << endl;
+
   bool bmp =
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
   BkgScrollMode scrl_mode =
@@ -604,7 +606,9 @@ uint8_t ppu_read(uint8_t address) {
   case reg_vram_data: {
     uint16_t vram_addr = ((ppu_regs[reg_vram_addr_msb] & 0x1F) << 8) |
                          ppu_regs[reg_vram_addr_lsb];
-    return vram[vram_addr]; // TODO: are SPRAM and VRAM reads swapped?
+    cout << "vram rd " << hex << vram_addr;
+    return vram[vram_addr]; // TODO: are SPRAM and VRAM reads
+                            // swapped?
   }
   case reg_ppu_stat: {
     // Clear VBLANK IRQ here
@@ -627,6 +631,7 @@ void ppu_write(uint8_t address, uint8_t data) {
     }
     ppu_regs[reg_spram_addr_msb] = (spram_addr >> 8) & 0x07;
     ppu_regs[reg_spram_addr_lsb] = spram_addr & 0xFF;
+    break;
   }
   case reg_vram_data: {
     uint16_t vram_addr = ((ppu_regs[reg_vram_addr_msb] & 0x1F) << 8) |
@@ -635,9 +640,17 @@ void ppu_write(uint8_t address, uint8_t data) {
     vram[vram_addr++] = data;
     ppu_regs[reg_vram_addr_msb] = (vram_addr >> 8) & 0x1F;
     ppu_regs[reg_vram_addr_lsb] = vram_addr & 0xFF;
+    break;
   }
   default:
+
     ppu_regs[address] = data;
+    if (address == reg_vram_addr_msb || address == reg_vram_addr_lsb) {
+      cout << "vram set addr 0x" << hex
+           << ((ppu_regs[reg_vram_addr_msb] << 8) | ppu_regs[reg_vram_addr_lsb])
+           << endl;
+    }
+    break;
   }
 }
 
