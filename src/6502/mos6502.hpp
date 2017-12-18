@@ -160,6 +160,8 @@ public:
   uint16_t nmiVectorH = 0xFFFB;
   uint16_t nmiVectorL = 0xFFFA;
 
+  uint16_t GetPC();
+
   // MiWi2 style scrambling
   bool scramble = false;
 };

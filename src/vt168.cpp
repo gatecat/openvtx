@@ -137,14 +137,33 @@ static void vt168_cpu_tick() {
 
 static int cpu_ratio = 5; // set to 4 for NTSC
 static int cpu_div = 0;
-void vt168_tick() {
+static bool last_vblank = false;
+bool vt168_tick() {
   vt168_scpu_tick();
   cpu_div++;
   if (cpu_div == cpu_ratio) {
     cpu_div = 0;
     vt168_cpu_tick();
     ppu_tick();
+    if (ppu_is_vblank() && !last_vblank) {
+      cout << "PC: " << va_to_str(cpu->GetPC()) << endl;
+      cout << "mem[PC]: ";
+      for (int i = 0; i < 4; i++) {
+        int addr = cpu->GetPC() + i;
+        if ((addr < 0x2000) || (addr >= 0x4000))
+          cout << hex << int(read_mem_virtual(addr)) << " ";
+      }
+      cout << endl;
+      if (cpu->GetPC() <= 0x104)
+        assert(false);
+      if (ppu_nmi_enabled())
+        cpu->NMI();
+
+      return true;
+    }
+    last_vblank = ppu_is_vblank();
   }
+  return false;
 }
 
 }; // namespace VTxx

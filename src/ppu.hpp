@@ -20,6 +20,7 @@ uint8_t ppu_read(uint8_t addr);
 
 bool ppu_is_render_done();
 bool ppu_is_vblank();
+bool ppu_nmi_enabled();
 
 // Return the PPU output as a 256x240 ARGB buffer
 uint32_t *get_render_buffer();

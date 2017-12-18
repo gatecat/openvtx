@@ -28,17 +28,7 @@ static int layer_width, layer_height;
 static uint32_t *obuf;
 static int out_width, out_height;
 
-void ppu_init() {
-  layer_width = 256;
-  layer_height = 256;
-
-  for (int i = 0; i < 4; i++) {
-    layers[i] = new uint32_t[layer_width * layer_height];
-  }
-  out_width = 256;
-  out_height = 240;
-  obuf = new uint32_t[out_width * out_height];
-}
+static thread ppu_thread;
 
 enum class ColourMode { IDX_4, IDX_16, IDX_64, IDX_256, ARGB1555 };
 
@@ -567,6 +557,19 @@ bool ppu_is_vblank() { return (ticks >= vblank_start && ticks < vblank_len); }
 
 uint32_t *get_render_buffer() { return obuf; }
 
+void ppu_init() {
+  layer_width = 256;
+  layer_height = 256;
+
+  for (int i = 0; i < 4; i++) {
+    layers[i] = new uint32_t[layer_width * layer_height];
+  }
+  out_width = 256;
+  out_height = 240;
+  obuf = new uint32_t[out_width * out_height];
+  ppu_thread = thread(ppu_render_thread);
+}
+
 void ppu_stop() {
   {
     lock_guard<mutex> lk(do_render_m);
@@ -631,4 +634,7 @@ void ppu_write(uint8_t address, uint8_t data) {
     ppu_regs[address] = data;
   }
 }
+
+bool ppu_nmi_enabled() { return get_bit(ppu_regs[0], 0); }
+
 } // namespace VTxx

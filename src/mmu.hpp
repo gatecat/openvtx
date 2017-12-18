@@ -19,6 +19,8 @@ void write_mem_virtual(uint16_t addr, uint8_t data);
 uint8_t read_mem_physical(uint32_t addr);
 void write_mem_physical(uint32_t addr, uint8_t data);
 
+string va_to_str(uint16_t va);
+
 // Custom read and write overrides for control registers
 // Set to nullptr if just a plain register
 extern ReadHandler reg_read_fn[256];

@@ -4,7 +4,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
-
+#include <sstream>
 using namespace std;
 
 namespace VTxx {
@@ -27,7 +27,7 @@ void load_rom(const string &filename) {
     cerr << "Failed to load ROM" << endl;
     assert(false);
   }
-  romf.read(rom, sizeof(rom));
+  romf.read(reinterpret_cast<char *>(rom), sizeof(rom));
   size_t romsize = romf.gcount();
   cout << "Loaded ROM, size = " << (romsize / 1024) << "KB" << endl;
 }
@@ -215,6 +215,14 @@ uint8_t read_mem_physical(uint32_t addr) {
 void write_mem_physical(uint32_t addr, uint8_t data) {
   assert(addr < sizeof(rom));
   rom[addr] = data;
+}
+
+string va_to_str(uint16_t va) {
+  ostringstream s;
+  s << "0x" << hex << va;
+  if (va >= 0x4000)
+    s << " ( -> 0x" << hex << decode_address(va) << ")";
+  return s.str();
 }
 
 } // namespace VTxx

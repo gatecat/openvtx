@@ -1,5 +1,5 @@
-
 #include "mos6502.hpp"
+#include <cassert>
 namespace mos6502 {
 
 #define NEGATIVE 0x80
@@ -552,7 +552,7 @@ mos6502::mos6502(BusRead r, BusWrite w) {
   instr.code = &mos6502::Op_TYA;
   InstrTable[0x98] = instr;
 
-  Reset();
+  // Reset();
 
   return;
 }
@@ -868,6 +868,8 @@ void mos6502::Op_BPL(uint16_t src) {
 }
 
 void mos6502::Op_BRK(uint16_t src) {
+  cout << "BRK!!!" << endl;
+  assert(false);
   pc++;
   StackPush((pc >> 8) & 0xFF);
   StackPush(pc & 0xFF);
@@ -1242,4 +1244,6 @@ void mos6502::Op_TYA(uint16_t src) {
   A = m;
   return;
 }
+
+uint16_t mos6502::GetPC() { return pc; }
 } // namespace mos6502
