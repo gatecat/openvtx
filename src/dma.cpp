@@ -2,7 +2,7 @@
 #include "mmu.hpp"
 #include "util.hpp"
 #include <cassert>
-
+#include <iostream>
 namespace VTxx {
 
 DMACtrl::DMACtrl() {}
@@ -49,7 +49,8 @@ void DMACtrl::do_xfer() {
 
   bool vram_dest = is_vram_xfer();
   int len = dma_regs[5];
-
+  if (vram_dest)
+    cout << "VDMA " << len << endl;
   for (int i = 0; i < len; i++) {
     uint8_t dat =
         is_extsrc ? read_mem_physical(srcaddr_c) : cpu_ram[srcaddr_c & 0x1FFF];

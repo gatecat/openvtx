@@ -12,6 +12,12 @@ SDL_Window *ppu_window;
 SDL_Renderer *ppuwin_renderer;
 
 int main(int argc, const char *argv[]) {
+  if (argc < 3) {
+    cerr << "Usage: " << endl;
+    cerr << "openvtx platform rom.bin" << endl << endl;
+    cerr << "Supported platforms: vt168 miwi2" << endl;
+    return 2;
+  }
   ppu_window = SDL_CreateWindow("openvtx", SDL_WINDOWPOS_CENTERED,
                                 SDL_WINDOWPOS_CENTERED, 256, 240, 0);
   if (ppu_window == nullptr) {
@@ -20,8 +26,17 @@ int main(int argc, const char *argv[]) {
   }
   ppuwin_renderer =
       SDL_CreateRenderer(ppu_window, -1, SDL_RENDERER_ACCELERATED);
-
-  vt168_init(VT168_Platform::VT168_BASE, argv[1]);
+  VT168_Platform plat;
+  std::string platform_str = argv[1];
+  if (platform_str == "vt168") {
+    plat = VT168_Platform::VT168_BASE;
+  } else if (platform_str == "miwi2") {
+    plat = VT168_Platform::VT168_MIWI2;
+  } else {
+    cerr << "Supported platforms: vt168 miwi2" << endl;
+    return 2;
+  }
+  vt168_init(plat, argv[2]);
   cout << "vector = 0x" << hex
        << (read_mem_virtual(0xfffd) << 8UL | read_mem_virtual(0xfffc)) << endl;
   bool last_render_done = false;

@@ -131,6 +131,7 @@ static void vt168_scpu_tick() {
 }
 
 static void vt168_cpu_tick() {
+  // cout << "PC: " << va_to_str(cpu->GetPC()) << endl;
   cpu->Run(1);
   cpu_timer->tick();
 }
@@ -141,12 +142,16 @@ static bool last_vblank = false;
 bool vt168_tick() {
   vt168_scpu_tick();
   cpu_div++;
+  bool is_vblank = false;
   if (cpu_div == cpu_ratio) {
     cpu_div = 0;
     vt168_cpu_tick();
     ppu_tick();
+    if (ppu_is_vblank())
+      cpu_dma->vblank_notify();
+
     if (ppu_is_vblank() && !last_vblank) {
-      cout << "PC: " << va_to_str(cpu->GetPC()) << endl;
+      /*cout << "PC: " << va_to_str(cpu->GetPC()) << endl;
       cout << "mem[PC]: ";
       for (int i = 0; i < 4; i++) {
         int addr = cpu->GetPC() + i;
@@ -155,15 +160,17 @@ bool vt168_tick() {
       }
       cout << endl;
       if (cpu->GetPC() <= 0x104)
-        assert(false);
-      if (ppu_nmi_enabled())
+        assert(false);*/
+      if (ppu_nmi_enabled()) {
+        cout << "-- NMI --" << endl;
         cpu->NMI();
+      }
 
-      return true;
+      is_vblank = true;
     }
     last_vblank = ppu_is_vblank();
   }
-  return false;
+  return is_vblank;
 }
 
 }; // namespace VTxx

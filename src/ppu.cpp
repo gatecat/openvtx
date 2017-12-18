@@ -5,8 +5,10 @@
 #include <atomic>
 #include <cassert>
 #include <condition_variable>
+#include <iostream>
 #include <mutex>
 #include <thread>
+
 namespace VTxx {
 
 static volatile uint8_t ppu_regs[256];
@@ -175,7 +177,6 @@ static void render_sprites() {
                     ppu_regs_shadow[reg_sp_seg_lsb];
 
   uint8_t tempbuf[16 * 16];
-
   for (int idx = 239; idx >= 0; idx--) {
     volatile uint8_t *spdata = spram + 8 * idx;
     uint16_t vector = ((spdata[1] & 0x0F) << 8UL) | spdata[0];
@@ -398,6 +399,7 @@ static void render_background(int idx) {
                           (cell_pal_bk >> 2))
                        : ((fmt == ColourMode::IDX_64) ? (cell_pal_bk >> 2) : 0);
       }
+
       get_char_data(seg, vector, tile_width, tile_height, fmt, bmp, char_buf);
       // TODO: line scrolling
       uint16_t palette_offset =

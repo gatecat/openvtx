@@ -737,7 +737,7 @@ void mos6502::Run(uint32_t n) {
   while (start + n > cycles && !illegalOpcode) {
     // fetch
     opcode = Read(pc++);
-    if (scramble && (pc >= 0x2000)) {
+    if (scramble /*&& (pc >= 0x2000)*/) {
       int b2 = (opcode & 0x04) >> 2;
       int b7 = (opcode & 0x80) >> 7;
       opcode = opcode & 0x7B;
@@ -750,6 +750,11 @@ void mos6502::Run(uint32_t n) {
 
     // execute
     Exec(instr);
+
+    if (illegalOpcode) {
+      cout << "illegal at pc=" << hex << (pc - 1) << endl;
+      assert(false);
+    }
 
     cycles++;
   }
