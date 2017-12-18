@@ -110,7 +110,7 @@ void vt168_init(VT168_Platform plat, const std::string &rom) {
     cpu_timer->write(0xA, b);
     control_reg[0x0B] = b;
   };
-
+  // reg_read_fn[0x0E] = [](uint16_t a) { return uint8_t(0x00); };
   cpu_dma = new DMACtrl();
   for (uint8_t a = 0x22; a <= 0x28; a++) {
     reg_read_fn[a] = [](uint16_t a) { return cpu_dma->read(a - 0x2122); };

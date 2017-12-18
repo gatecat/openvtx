@@ -1,3 +1,4 @@
 *.o
 openvtx
 *.trace
+roms/
