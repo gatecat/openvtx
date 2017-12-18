@@ -19,7 +19,7 @@ private:
   void do_xfer();
   bool is_vram_xfer();
   inline bool is_busy() { return waiting_vblank; }
-  inline uint16_t get_src_addr() { return (dma_regs[2] << 8UL) | dma_regs[3]; }
+  inline uint16_t get_src_addr() { return (dma_regs[3] << 8UL) | dma_regs[2]; }
   inline uint16_t get_dst_addr() { return (dma_regs[1] << 8UL) | dma_regs[0]; }
 };
 

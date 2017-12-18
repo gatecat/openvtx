@@ -158,6 +158,7 @@ static void get_char_data(uint16_t seg, uint16_t vector, int w, int h,
     spacing *= bpp;
   spacing /= 8;
   uint32_t pa = (seg << 13UL) + vector * spacing;
+  // cout << "pa = 0x" << hex << pa << endl;
   int len = (w * h * bpp) / 8;
   for (int i = 0; i < len; i++)
     buf[i] = read_mem_physical(pa + i);
@@ -441,8 +442,10 @@ static inline uint32_t argb1555_to_rgb8888(uint16_t x) {
   uint8_t g = (x >> 5) & 0x1F;
   uint8_t b = (x >> 10) & 0x1F;
   bool a = get_bit(x, 15);
+  if (a)
+    return 0xFF000000;
   uint32_t y = 0;
-  y |= a ? 0x00000000 : 0xFF000000;
+  y |= 0xFF000000;
   y |= c5_to_8(r) << 16UL;
   y |= c5_to_8(g) << 8UL;
   y |= c5_to_8(b);
@@ -466,18 +469,18 @@ static void merge_layers(bool lcd = false) {
         if (!(raw & 0x80000000)) {
           pal1 = (raw >> 16) & 0xFFFF;
         }
-        uint16_t res = 0x8000;
-        if (blend_pal && output_pal0 && output_pal1) {
-          res = blend_argb1555(pal0, pal1);
-        }
-        if (output_pal0 && !(pal0 & 0x8000)) {
-          res = pal0;
-        }
-        if (output_pal1 && !(pal1 & 0x8000)) {
-          res = pal1;
-        }
-        obuf[y * out_width + x] = argb1555_to_rgb8888(res);
       }
+      uint16_t res = 0x8000;
+      if (blend_pal && output_pal0 && output_pal1) {
+        res = blend_argb1555(pal0, pal1);
+      }
+      if (output_pal0 && !(pal0 & 0x8000)) {
+        res = pal0;
+      }
+      if (output_pal1 && !(pal1 & 0x8000)) {
+        res = pal1;
+      }
+      obuf[y * out_width + x] = argb1555_to_rgb8888(res);
     }
   }
 }
@@ -628,6 +631,7 @@ void ppu_write(uint8_t address, uint8_t data) {
   case reg_vram_data: {
     uint16_t vram_addr = ((ppu_regs[reg_vram_addr_msb] & 0x1F) << 8) |
                          ppu_regs[reg_vram_addr_lsb];
+    cout << "vram wr " << hex << vram_addr << " d=" << int(data) << endl;
     vram[vram_addr++] = data;
     ppu_regs[reg_vram_addr_msb] = (vram_addr >> 8) & 0x1F;
     ppu_regs[reg_vram_addr_lsb] = vram_addr & 0xFF;
