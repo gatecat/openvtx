@@ -12,9 +12,10 @@ bool DMACtrl::is_vram_xfer() {
 };
 
 void DMACtrl::write(uint8_t addr, uint8_t data) {
+  cout << "dma write " << (int)addr << " " << (int)data << endl;
   assert(addr <= 6);
   dma_regs[addr] = data;
-  if ((addr == 5) && (!is_busy()) && (data != 0)) {
+  if ((addr == 5) && (!is_busy()) /*&& (data != 0)*/) {
     if (is_vram_xfer()) {
       waiting_vblank = true;
     } else {
@@ -49,6 +50,8 @@ void DMACtrl::do_xfer() {
 
   bool vram_dest = is_vram_xfer();
   int len = unsigned(dma_regs[5]) * 2;
+  if (len == 0)
+    len = 512;
   if (vram_dest)
     cout << "VDMA " << len << " " << get_dst_addr() << endl;
   for (int i = 0; i < len; i++) {
