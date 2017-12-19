@@ -4,6 +4,7 @@
 #include "extalu.hpp"
 #include "input.hpp"
 #include "irq.hpp"
+#include "miwi2_input.hpp"
 #include "mmu.hpp"
 #include "ppu.hpp"
 #include "scpu_mem.hpp"
@@ -26,7 +27,7 @@ static IRQController *cpu_irq, *scpu_irq;
 static DMACtrl *cpu_dma;
 
 static InputDev *inp;
-
+static MiWi2Input *mw2inp = nullptr;
 static const vector<IRQVector> cpu_vectors = {
     {0xFFFF, 0xFFFE}, // 0 EXT
     {0xFFF9, 0xFFF8}, // 1 TIMER
@@ -45,16 +46,7 @@ static int fcount = 0;
 static int last_fcount = 0;
 
 chrono::system_clock::time_point last_update;
-// IO test signal
-const vector<uint8_t> signal_test = {1, 0, 1, 1, 1, 1, 0, 1};
 
-const int signal_period = 20;
-const int signal_start = 1000;
-
-bool signal_val = 0;
-int signal_count = 0;
-int ioa = 0x00;
-int ioa_idx = 0;
 void vt168_init(VT168_Platform plat, const std::string &rom) {
   mmu_init();
   ppu_init();
@@ -124,17 +116,6 @@ void vt168_init(VT168_Platform plat, const std::string &rom) {
     cpu_timer->write(0xA, b);
     control_reg[0x0B] = b;
   };
-  reg_read_fn[0x0F] = [](uint16_t a) {
-    return uint8_t((ioa_idx <= 3) ? 0x00 : 0xFF);
-  };
-  reg_read_fn[0x0E] = [](uint16_t a) {
-    ioa_idx++;
-    return uint8_t(
-        (ioa_idx == 2)
-            ? ~(inp->btn_state & 0x0F)
-            : ((ioa_idx == 1) ? ~((inp->btn_state >> 4) & 0x0F) : 0xFF));
-  };
-
   cpu_dma = new DMACtrl();
   for (uint8_t a = 0x22; a <= 0x28; a++) {
     reg_read_fn[a] = [](uint16_t a) { return cpu_dma->read(a - 0x2122); };
@@ -144,7 +125,14 @@ void vt168_init(VT168_Platform plat, const std::string &rom) {
   }
 
   inp = new InputDev();
+
   reg_read_fn[0x29] = [](uint16_t a) { return inp->read(0); };
+
+  if (plat == VT168_Platform::VT168_MIWI2) {
+    mw2inp = new MiWi2Input();
+    reg_read_fn[0x0E] = [](uint16_t a) { return mw2inp->read(0); };
+    reg_read_fn[0x0F] = [](uint16_t a) { return mw2inp->read(1); };
+  }
 
   // TODO: init misc control regs
 
@@ -186,9 +174,9 @@ bool vt168_tick() {
     ppu_tick();
 
     if (ppu_is_vblank() && !last_vblank) {
-      ioa_idx = 0;
-      ioa = 8;
-      signal_count = 0;
+      if (mw2inp != nullptr) {
+        mw2inp->notify_vblank();
+      }
       /*cout << "PC: " << va_to_str(cpu->GetPC()) << endl;
       cout << "mem[PC]: ";
       for (int i = 0; i < 4; i++) {
@@ -219,21 +207,15 @@ bool vt168_tick() {
     if (ppu_is_vblank())
       cpu_dma->vblank_notify();
     last_vblank = ppu_is_vblank();
-    signal_count++;
-    if ((signal_count >= signal_start) &&
-        (signal_count < (signal_start + signal_period * signal_test.size()))) {
-      signal_val =
-          signal_test.at((signal_count - signal_start) / signal_period);
-      // if (((signal_count - signal_start) % signal_period) == 0)
-      //  cout << "signal <- " << signal_val << endl;
-    }
-    if ((signal_count % 1000) == 0) {
-      //  cout << "cnt = " << signal_count << endl;
-    }
   }
   return is_vblank;
 }
 
-void vt168_process_event(SDL_Event *ev) { inp->process_event(ev); }
+void vt168_process_event(SDL_Event *ev) {
+  inp->process_event(ev);
+  if (mw2inp != nullptr) {
+    mw2inp->process_event(ev);
+  }
+}
 
 }; // namespace VTxx
