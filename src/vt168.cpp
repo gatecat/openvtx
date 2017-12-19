@@ -83,13 +83,13 @@ void vt168_init(VT168_Platform plat, const std::string &rom) {
   cpu_alu = new ExtALU(true, false);
   scpu_alu = new ExtALU(true, false);
   for (uint8_t a = 0x30; a <= 0x37; a++) {
-    reg_read_fn[a] = [](uint16_t a) { return cpu_alu->read(a & 0xFF); };
-    scpu_reg_read_fn[a] = [](uint16_t a) { return scpu_alu->read(a & 0xFF); };
+    reg_read_fn[a] = [](uint16_t a) { return cpu_alu->read(a & 0x0F); };
+    scpu_reg_read_fn[a] = [](uint16_t a) { return scpu_alu->read(a & 0x0F); };
     reg_write_fn[a] = [](uint16_t a, uint8_t d) {
-      cpu_alu->write(a & 0xFF, d);
+      cpu_alu->write(a & 0x0F, d);
     };
     scpu_reg_write_fn[a] = [](uint16_t a, uint8_t d) {
-      scpu_alu->write(a & 0xFF, d);
+      scpu_alu->write(a & 0x0F, d);
     };
   }
 
