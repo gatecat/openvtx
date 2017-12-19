@@ -12,7 +12,6 @@ public:
   uint8_t read(uint8_t addr);
   void process_event(SDL_Event *ev);
 
-private:
   uint8_t btn_state = 0;
   uint8_t shiftreg = 0;
 };

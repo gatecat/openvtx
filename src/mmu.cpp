@@ -178,8 +178,8 @@ uint8_t read_mem_virtual(uint16_t addr) {
   } else if (addr >= 0x2000 && addr <= 0x20FF) {
     return ppu_read(addr & 0xFF);
   } else if (addr >= 0x2100 && addr <= 0x21FF) {
-    /*if ((addr >= 0x210D) && (addr <= 0x210F))
-      cout << "IOx READ 0x" << hex << addr << endl;*/
+    if ((addr >= 0x210D) && (addr <= 0x210F))
+      cout << "IOx READ 0x" << hex << addr << endl;
     // System regs read
     uint8_t reg_addr = addr & 0xFF;
     if (reg_addr == reg_prg_bank0_reg4_rd)
@@ -209,8 +209,8 @@ void write_mem_virtual(uint16_t addr, uint8_t data) {
   } else if (addr >= 0x2000 && addr <= 0x20FF) {
     ppu_write(addr & 0xFF, data);
   } else if (addr >= 0x2100 && addr <= 0x21FF) {
-    // if ((addr >= 0x210D) && (addr <= 0x210F))
-    // cout << "CTRL WRITE 0x" << hex << addr << " d " << int(data) << endl;
+    if ((addr >= 0x210D) && (addr <= 0x210F))
+      cout << "CTRL WRITE 0x" << hex << addr << " d " << int(data) << endl;
     uint8_t reg_addr = addr & 0xFF;
     if (reg_write_fn[reg_addr] != nullptr)
       (reg_write_fn[reg_addr])(addr, data);
