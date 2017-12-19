@@ -2,3 +2,4 @@
 openvtx
 *.trace
 roms/
+vgcore.*

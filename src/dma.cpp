@@ -5,14 +5,17 @@
 #include <iostream>
 namespace VTxx {
 
-DMACtrl::DMACtrl() {}
+DMACtrl::DMACtrl() {
+  for (int i = 0; i < 7; i++)
+    dma_regs[i] = 0;
+}
 
 bool DMACtrl::is_vram_xfer() {
   return get_dst_addr() == 0x2004 || get_dst_addr() == 0x2007;
 };
 
 void DMACtrl::write(uint8_t addr, uint8_t data) {
-  // cout << "dma write " << (int)addr << " " << (int)data << endl;
+  cout << "dma write " << (int)addr << " " << (int)data << endl;
   assert(addr <= 6);
   dma_regs[addr] = data;
   if ((addr == 5) && (!is_busy()) /*&& (data != 0)*/) {

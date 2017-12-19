@@ -680,7 +680,7 @@ void mos6502::Reset() {
   pc = (Read(rstVectorH) << 8) + Read(rstVectorL); // load PC from reset vector
 
   sp = 0xFD;
-
+  status = 0;
   status |= CONSTANT;
 
   cycles =

@@ -20,10 +20,10 @@ public:
 private:
   void do_mul();
   void do_div();
-  uint8_t operand[4];
-  uint8_t mul_operand[2];
-  uint8_t div_operand[2];
-  uint8_t result[6];
+  uint8_t operand[4] = {0};
+  uint8_t mul_operand[2] = {0};
+  uint8_t div_operand[2] = {0};
+  uint8_t result[6] = {0};
 
   bool rem_quirk;
   bool read_offset;

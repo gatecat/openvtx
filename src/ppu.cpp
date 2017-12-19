@@ -158,7 +158,7 @@ static void get_char_data(uint16_t seg, uint16_t vector, int w, int h,
     spacing *= bpp;
   spacing /= 8;
   uint32_t pa = (seg << 13UL) + vector * spacing;
-  // cout << "pa = 0x" << hex << pa << endl;
+  cout << "pa = 0x" << hex << pa << endl;
   int len = (w * h * bpp) / 8;
   for (int i = 0; i < len; i++)
     buf[i] = read_mem_physical(pa + i);
@@ -567,7 +567,8 @@ uint32_t *get_render_buffer() { return obuf; }
 void ppu_init() {
   layer_width = 256;
   layer_height = 256;
-
+  for (int i = 0; i < 256; i++)
+    ppu_regs[i] = 0;
   for (int i = 0; i < 4; i++) {
     layers[i] = new uint32_t[layer_width * layer_height];
   }
@@ -620,6 +621,7 @@ uint8_t ppu_read(uint8_t address) {
 }
 
 void ppu_write(uint8_t address, uint8_t data) {
+  lock_guard<std::mutex> guard(regs_mutex);
   switch (address) {
   case reg_spram_data: {
     uint16_t spram_addr = ((ppu_regs[reg_spram_addr_msb] & 0x07) << 8) |
