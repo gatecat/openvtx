@@ -157,8 +157,6 @@ bool vt168_tick() {
     cpu_div = 0;
     vt168_cpu_tick();
     ppu_tick();
-    if (ppu_is_vblank())
-      cpu_dma->vblank_notify();
 
     if (ppu_is_vblank() && !last_vblank) {
       /*cout << "PC: " << va_to_str(cpu->GetPC()) << endl;
@@ -178,6 +176,8 @@ bool vt168_tick() {
 
       is_vblank = true;
     }
+    if (ppu_is_vblank())
+      cpu_dma->vblank_notify();
     last_vblank = ppu_is_vblank();
   }
   return is_vblank;

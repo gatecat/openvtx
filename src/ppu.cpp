@@ -46,10 +46,14 @@ static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
     int dy = dst_y + sy;
     for (int sx = 0; sx < src_width; sx++) {
       int dx = dst_x + sx;
-      uint16_t argb0, argb1;
+      uint16_t argb0 = 0x8000, argb1 = 0x8000;
       if (fmt == ColourMode::ARGB1555) {
         argb0 = (*(srcptr + 1) << 8UL) | (*srcptr);
         argb1 = argb0;
+        if (pal0 == nullptr)
+          argb0 = 0x8000;
+        if (pal1 == nullptr)
+          argb1 = 0x8000;
         srcptr += 2;
       } else {
         uint8_t raw = 0;

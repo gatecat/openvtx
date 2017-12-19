@@ -29,7 +29,7 @@ void DMACtrl::write(uint8_t addr, uint8_t data) {
 
 uint8_t DMACtrl::read(uint8_t addr) {
   assert(addr <= 6);
-  cout << "dma read " << int(addr) << endl;
+  // cout << "dma read " << int(addr) << endl;
   if (addr == 5) {
     return 0x00 | is_busy();
   } else {
@@ -44,7 +44,7 @@ void DMACtrl::do_xfer() {
     srcaddr_c |= (dma_regs[4] << 15UL);
     srcaddr_c |= ((dma_regs[6] & 0x03) << 23UL);
   }
-  srcaddr_c &= ~0x01;
+  //  srcaddr_c &= ~0x01;
   bool is_extdst = get_bit(get_dst_addr(), 15);
   uint32_t dstaddr_c = get_dst_addr() & 0x7FFF;
   if (is_extdst) {
@@ -58,8 +58,6 @@ void DMACtrl::do_xfer() {
   int len = unsigned(dma_regs[5]) * 2;
   if (len == 0)
     len = 512;
-  /*if (len == 2)
-    len = 0;*/
   if (vram_dest)
     cout << "VDMA " << len << " " << get_dst_addr() << endl;
   for (int i = 0; i < len; i++) {
@@ -79,7 +77,7 @@ void DMACtrl::do_xfer() {
   dma_regs[3] = (dma_regs[3] & 0x80) | ((srcaddr_c >> 8) & 0x7F);
   dma_regs[2] = (srcaddr_c & 0xFF);
   if (is_extsrc) {
-    dma_regs[4] = (srcaddr_c >> 15) & 0xFF;
+    // dma_regs[4] = (srcaddr_c >> 15) & 0xFF;
   }
   dma_regs[1] = (dma_regs[1] & 0x80) | ((dstaddr_c >> 8) & 0x7F);
   dma_regs[0] = (dstaddr_c & 0xFF);

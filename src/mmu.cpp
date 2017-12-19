@@ -20,6 +20,11 @@ WriteHandler reg_write_fn[256] = {nullptr};
 
 void mmu_init() {
   // TODO: default paging values?
+  for (int i = 0; i < 256; i++) {
+    control_reg[i] = 0x0;
+    reg_read_fn[i] = nullptr;
+    reg_write_fn[i] = nullptr;
+  }
 }
 
 void load_rom(const string &filename) {
