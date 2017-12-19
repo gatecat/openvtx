@@ -158,7 +158,7 @@ static void get_char_data(uint16_t seg, uint16_t vector, int w, int h,
     spacing *= bpp;
   spacing /= 8;
   uint32_t pa = (seg << 13UL) + vector * spacing;
-  cout << "pa = 0x" << hex << pa << endl;
+  //  cout << "pa = 0x" << hex << pa << endl;
   int len = (w * h * bpp) / 8;
   for (int i = 0; i < len; i++)
     buf[i] = read_mem_physical(pa + i);
@@ -589,8 +589,8 @@ void ppu_stop() {
 
 const uint8_t reg_ppu_stat = 0x01;
 
-const uint8_t reg_spram_addr_msb = 0x02;
-const uint8_t reg_spram_addr_lsb = 0x03;
+const uint8_t reg_spram_addr_msb = 0x03;
+const uint8_t reg_spram_addr_lsb = 0x02;
 const uint8_t reg_spram_data = 0x04;
 
 const uint8_t reg_vram_addr_msb = 0x06;
@@ -600,8 +600,8 @@ const uint8_t reg_vram_data = 0x07;
 uint8_t ppu_read(uint8_t address) {
   switch (address) {
   case reg_spram_data: {
-    uint16_t spram_addr = ((ppu_regs[reg_spram_addr_msb] & 0x07) << 8) |
-                          ppu_regs[reg_spram_addr_lsb];
+    uint16_t spram_addr = (ppu_regs[reg_spram_addr_msb] << 3) |
+                          (ppu_regs[reg_spram_addr_lsb] & 0x07);
     return spram[spram_addr]; // TODO: are SPRAM and VRAM reads swapped?
   }
   case reg_vram_data: {
@@ -624,15 +624,15 @@ void ppu_write(uint8_t address, uint8_t data) {
   lock_guard<std::mutex> guard(regs_mutex);
   switch (address) {
   case reg_spram_data: {
-    uint16_t spram_addr = ((ppu_regs[reg_spram_addr_msb] & 0x07) << 8) |
-                          ppu_regs[reg_spram_addr_lsb];
+    uint16_t spram_addr = (ppu_regs[reg_spram_addr_lsb] & 0x07) |
+                          (ppu_regs[reg_spram_addr_msb] << 3);
     spram[spram_addr++] = data;
     if ((spram_addr & 0x07) >= 6) { // TODO: check, is this just for DMA?
       spram_addr &= ~0x07;
       spram_addr += 8;
     }
-    ppu_regs[reg_spram_addr_msb] = (spram_addr >> 8) & 0x07;
-    ppu_regs[reg_spram_addr_lsb] = spram_addr & 0xFF;
+    ppu_regs[reg_spram_addr_msb] = (spram_addr >> 3) & 0xFF;
+    ppu_regs[reg_spram_addr_lsb] = spram_addr & 0x07;
     break;
   }
   case reg_vram_data: {
@@ -647,10 +647,11 @@ void ppu_write(uint8_t address, uint8_t data) {
   default:
 
     ppu_regs[address] = data;
-    if (address == reg_vram_addr_msb || address == reg_vram_addr_lsb) {
-      /*cout << "vram set addr 0x" << hex
-           << ((ppu_regs[reg_vram_addr_msb] << 8) | ppu_regs[reg_vram_addr_lsb])
-           << endl;*/
+    if (address == reg_spram_addr_msb || address == reg_spram_addr_lsb) {
+      cout << "spram set addr 0x" << hex
+           << ((ppu_regs[reg_spram_addr_lsb] & 0x07) |
+               (ppu_regs[reg_spram_addr_msb] << 3))
+           << endl;
     }
     break;
   }

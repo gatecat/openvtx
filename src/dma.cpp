@@ -71,6 +71,8 @@ void DMACtrl::do_xfer() {
       dstaddr_c++;
     srcaddr_c++;
   }
+  dma_regs[3] = (dma_regs[3] & 0x80) | ((srcaddr_c >> 8) & 0x7F);
+  dma_regs[2] = (srcaddr_c & 0xFF);
 }
 
 void DMACtrl::vblank_notify() {
