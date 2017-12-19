@@ -11,6 +11,7 @@
 #include "util.hpp"
 
 #include <cassert>
+#include <chrono>
 #include <string>
 #include <vector>
 using namespace std;
@@ -40,6 +41,10 @@ static const vector<IRQVector> scpu_vectors = {
     {0x0FF7, 0x0FF6}, // 2 TIMERB
     {0x0FF5, 0x0FF4}  // 3 CPU
 };
+static int fcount = 0;
+static int last_fcount = 0;
+
+chrono::system_clock::time_point last_update;
 
 void vt168_init(VT168_Platform plat, const std::string &rom) {
   mmu_init();
@@ -110,7 +115,7 @@ void vt168_init(VT168_Platform plat, const std::string &rom) {
     cpu_timer->write(0xA, b);
     control_reg[0x0B] = b;
   };
-  // reg_read_fn[0x0E] = [](uint16_t a) { return uint8_t(0x00); };
+  reg_read_fn[0x0F] = [](uint16_t a) { return uint8_t(0xFF); };
   cpu_dma = new DMACtrl();
   for (uint8_t a = 0x22; a <= 0x28; a++) {
     reg_read_fn[a] = [](uint16_t a) { return cpu_dma->read(a - 0x2122); };
@@ -125,6 +130,7 @@ void vt168_init(VT168_Platform plat, const std::string &rom) {
   // TODO: init misc control regs
 
   cpu->Reset();
+  last_update = chrono::system_clock::now();
 }
 
 const int reg_sys = 0x06;
@@ -149,10 +155,12 @@ static void vt168_cpu_tick() {
 static int cpu_ratio = 5; // set to 4 for NTSC
 static int cpu_div = 0;
 static bool last_vblank = false;
+
 bool vt168_tick() {
   vt168_scpu_tick();
   cpu_div++;
   bool is_vblank = false;
+
   if (cpu_div == cpu_ratio) {
     cpu_div = 0;
     vt168_cpu_tick();
@@ -169,11 +177,21 @@ bool vt168_tick() {
       cout << endl;
       if (cpu->GetPC() <= 0x104)
         assert(false);*/
+      fcount++;
       if (ppu_nmi_enabled()) {
-        cout << "-- NMI --" << endl;
+        // cout << "-- NMI --" << endl;
         cpu->NMI();
       }
-
+      if (chrono::duration<double>(chrono::system_clock::now() - last_update)
+              .count() > 0.5) {
+        double fps =
+            double(fcount - last_fcount) /
+            (chrono::duration<double>(chrono::system_clock::now() - last_update)
+                 .count());
+        cout << "speed = " << dec << fps << "fps" << endl;
+        last_fcount = fcount;
+        last_update = chrono::system_clock::now();
+      }
       is_vblank = true;
     }
     if (ppu_is_vblank())

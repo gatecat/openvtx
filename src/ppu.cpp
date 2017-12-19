@@ -323,7 +323,7 @@ static void render_background(int idx) {
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl1[idx]], 4) : false;
   int bkx_clr = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 2) & 0x03;
   if (hclr) {
-    cout << "HCLR" << endl;
+    // cout << "HCLR" << endl;
     fmt = ColourMode::ARGB1555;
   } else {
     switch (bkx_clr) { // check, datasheet doesn't specify
@@ -352,19 +352,19 @@ static void render_background(int idx) {
   int yoff = unsigned(ppu_regs_shadow[reg_bkg_y[idx]]);
   if (y8)
     yoff = yoff - 256;
-  cout << "BKG" << idx << " loc " << xoff << " " << yoff << endl;
+  // cout << "BKG" << idx << " loc " << xoff << " " << yoff << endl;
 
   bool bmp =
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
   if (bmp) {
-    cout << "BMP" << endl;
+    // cout << "BMP" << endl;
   }
   BkgScrollMode scrl_mode =
       (BkgScrollMode)((ppu_regs_shadow[reg_bkg_ctrl1[idx]] >> 2) & 0x03);
   bool line_scroll = get_bit(ppu_regs_shadow[reg_bkg_linescroll], 4 + idx);
   int line_scroll_bank = ppu_regs_shadow[reg_bkg_linescroll] & 0x0F;
-  cout << "BKG" << idx << " ls " << line_scroll << " " << line_scroll_bank
-       << endl;
+  // cout << "BKG" << idx << " ls " << line_scroll << " " << line_scroll_bank
+  //<< endl;
   bool bkx_size = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 0);
   int tile_height = bmp ? 1 : (bkx_size ? 16 : 8);
   int tile_width = bmp ? 256 : (bkx_size ? 16 : 8);
@@ -659,10 +659,10 @@ void ppu_write(uint8_t address, uint8_t data) {
 
     ppu_regs[address] = data;
     if (address == reg_spram_addr_msb || address == reg_spram_addr_lsb) {
-      cout << "spram set addr 0x" << hex
+      /*cout << "spram set addr 0x" << hex
            << ((ppu_regs[reg_spram_addr_lsb] & 0x07) |
                (ppu_regs[reg_spram_addr_msb] << 3))
-           << endl;
+           << endl;*/
     }
     break;
   }
