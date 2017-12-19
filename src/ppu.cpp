@@ -212,7 +212,7 @@ const int reg_bkg_x[2] = {0x10, 0x14};
 const int reg_bkg_y[2] = {0x11, 0x15};
 const int reg_bkg_ctrl1[2] = {0x12, 0x16};
 
-// const int reg_bkg_linescroll = 0x20;
+const int reg_bkg_linescroll = 0x20;
 const int reg_bkg_ctrl2[2] = {0x13, 0x17};
 
 const int reg_bkg_pal_sel = 0x0F;
@@ -323,6 +323,7 @@ static void render_background(int idx) {
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl1[idx]], 4) : false;
   int bkx_clr = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 2) & 0x03;
   if (hclr) {
+    cout << "HCLR" << endl;
     fmt = ColourMode::ARGB1555;
   } else {
     switch (bkx_clr) { // check, datasheet doesn't specify
@@ -351,14 +352,19 @@ static void render_background(int idx) {
   int yoff = unsigned(ppu_regs_shadow[reg_bkg_y[idx]]);
   if (y8)
     yoff = yoff - 256;
-  // cout << "BKG" << idx << " loc " << xoff << " " << yoff << endl;
+  cout << "BKG" << idx << " loc " << xoff << " " << yoff << endl;
 
   bool bmp =
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
+  if (bmp) {
+    cout << "BMP" << endl;
+  }
   BkgScrollMode scrl_mode =
       (BkgScrollMode)((ppu_regs_shadow[reg_bkg_ctrl1[idx]] >> 2) & 0x03);
-  // bool line_scroll = get_bit(ppu_regs_shadow[reg_bkg_linescroll], 4 + idx);
-  // int line_scroll_bank = ppu_regs_shadow[reg_bkg_linescroll] & 0x0F;
+  bool line_scroll = get_bit(ppu_regs_shadow[reg_bkg_linescroll], 4 + idx);
+  int line_scroll_bank = ppu_regs_shadow[reg_bkg_linescroll] & 0x0F;
+  cout << "BKG" << idx << " ls " << line_scroll << " " << line_scroll_bank
+       << endl;
   bool bkx_size = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 0);
   int tile_height = bmp ? 1 : (bkx_size ? 16 : 8);
   int tile_width = bmp ? 256 : (bkx_size ? 16 : 8);
@@ -514,9 +520,9 @@ static void do_render() {
   }
   // Fill all layers with transparent
   clear_layers();
-  // Render background layers (lower index has priority)
-  for (int i = 1; i >= 0; i--)
-    render_background(i);
+  // Render background layers (higher index has priority)
+  render_background(0);
+  render_background(1);
   // Render sprites
   render_sprites();
   // Merge to output
