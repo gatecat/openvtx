@@ -141,7 +141,8 @@ static void vt168_scpu_tick() {
 
 static void vt168_cpu_tick() {
   // cout << "PC: " << va_to_str(cpu->GetPC()) << endl;
-  cpu->Run(1);
+  if (!cpu_dma->is_busy())
+    cpu->Run(1);
   cpu_timer->tick();
 }
 

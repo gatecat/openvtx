@@ -13,12 +13,13 @@ public:
 
   void vblank_notify(); // notify the DMA engine of the start of VBLANK
 
+  inline bool is_busy() { return waiting_vblank; }
+
 private:
   bool waiting_vblank = false;
   uint8_t dma_regs[7] = {0};
   void do_xfer();
   bool is_vram_xfer();
-  inline bool is_busy() { return waiting_vblank; }
   inline uint16_t get_src_addr() { return (dma_regs[3] << 8UL) | dma_regs[2]; }
   inline uint16_t get_dst_addr() { return (dma_regs[1] << 8UL) | dma_regs[0]; }
 };

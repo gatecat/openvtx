@@ -12,7 +12,7 @@
 namespace VTxx {
 
 static volatile uint8_t ppu_regs[256] = {0};
-static uint8_t ppu_regs_shadow[256] = {0};
+static volatile uint8_t ppu_regs_shadow[256] = {0};
 static mutex regs_mutex;
 
 static volatile uint8_t vram[8192] = {0};
@@ -388,7 +388,7 @@ static void render_background(int idx) {
       uint8_t cell_pal_bk = (cell >> 12) & 0x0F;
       if (vector == 0) // transparent
         continue;
-      uint8_t pal_bank = 0;
+      uint16_t pal_bank = 0;
       uint8_t depth = 0;
       if (bkx_pal) {
         depth = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 4) & 0x03;
@@ -398,7 +398,7 @@ static void render_background(int idx) {
       } else {
         depth = cell_pal_bk & 0x03;
         pal_bank = (fmt == ColourMode::IDX_16)
-                       ? (((ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 4) & 0x03) |
+                       ? (((ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 2) & 0x0C) |
                           (cell_pal_bk >> 2))
                        : ((fmt == ColourMode::IDX_64) ? (cell_pal_bk >> 2) : 0);
       }
@@ -407,8 +407,8 @@ static void render_background(int idx) {
       // TODO: line scrolling
       uint16_t palette_offset =
           (fmt == ColourMode::IDX_16)
-              ? (pal_bank * 32)
-              : (fmt == ColourMode::IDX_64 ? (pal_bank * 128) : 0);
+              ? (pal_bank * 32UL)
+              : (fmt == ColourMode::IDX_64 ? (pal_bank * 128UL) : 0);
       volatile uint8_t *pal0 = nullptr, *pal1 = nullptr;
       if (render_pal0)
         pal0 = (vram + 0x1E00 + palette_offset);
@@ -505,7 +505,8 @@ static void do_render() {
   // shouldn't really be accessing them though anyway
   {
     lock_guard<std::mutex> guard(regs_mutex);
-    copy(ppu_regs, ppu_regs + 256, ppu_regs_shadow);
+    for (int i = 0; i < 256; i++)
+      ppu_regs_shadow[i] = ppu_regs[i];
   }
   // Fill all layers with transparent
   clear_layers();
