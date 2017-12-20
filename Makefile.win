@@ -1,0 +1,13 @@
+src = $(wildcard src/*.cpp src/6502/*.cpp)
+obj = $(src:.cpp=.o)
+
+CXXFLAGS = -m32 -std=c++11 -g -O3 `wx-config-static --cxxflags` `sdl2-config --cflags` -I/mingw32/include/
+LDFLAGS = -m32 -lSDL2 -lpthread -static `wx-config-static --libs`  `sdl2-config --static-libs`
+all: openvtx
+
+openvtx: $(obj)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
+.PHONY: clean
+clean:
+	rm -f $(obj) openvtx

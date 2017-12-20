@@ -1,6 +1,7 @@
 #include "loadui.hpp"
+#define select select_noconflict
 #include <wx/wx.h>
-
+#undef select
 #include <cstdlib>
 #include <utility>
 #include <vector>

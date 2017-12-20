@@ -623,6 +623,7 @@ void ppu_stop() {
     kill_renderer = true;
   }
   do_render_cv.notify_one();
+  ppu_thread.join();
 }
 
 const uint8_t reg_ppu_stat = 0x01;
