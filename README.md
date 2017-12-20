@@ -25,3 +25,4 @@ The key bindings are as follows:
  - Enter maps to start and R-Shift maps to select
  - Z maps to B and X maps to A
  - R is a soft reset (possibly buggy)
+ 

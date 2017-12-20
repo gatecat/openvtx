@@ -1,1 +1,5 @@
 -std=c++14
+-I/usr/lib/wx/include/gtk2-unicode-3.0
+-I/usr/include/wx-3.0
+-DWXUSINGDLL
+-D__WXGTK__ 
