@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     plat_str = argv[1];
     rom_str = argv[2];
   }
-  ppu_window = SDL_CreateWindow("openvtx", SDL_WINDOWPOS_CENTERED,
+  ppu_window = SDL_CreateWindow("OpenVTx v0.10", SDL_WINDOWPOS_CENTERED,
                                 SDL_WINDOWPOS_CENTERED, 256, 240, 0);
   if (ppu_window == nullptr) {
     printf("Failed to create window: %s.\n", SDL_GetError());

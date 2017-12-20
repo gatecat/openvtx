@@ -1,4 +1,4 @@
-# OpenVTx Emulator for VR Tech Systems
+# OpenVTx Emulator for VR Tech Systems - version 0.10
 
 OpenVTx is an emulator for the 6502-based, NES-inspired VR Technology based game systems. At the moment
 it is an early work in progress, currently having some PPU rendering issues and no sound emulation.
