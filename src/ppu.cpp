@@ -18,12 +18,13 @@ static mutex regs_mutex;
 static volatile uint8_t vram[8192] = {0};
 static volatile uint8_t spram[2048] = {0};
 
+const int layer_count = 3 * 4;
 // Graphics layers
 // These use a *very* unusual format to match - at least as close as possible -
 // how the VT168 works. It consists of two 16-bit words, the MSW for palette
 // bank 1 and the LSW for palette bank 0. Each word is in TRGB1555 format,
 // where the MSb is 1 for transparent and 0 for solid
-static uint32_t *layers[4];
+static uint32_t *layers[layer_count];
 static int layer_width, layer_height;
 
 // Output buffer in ARGB8888 format
@@ -204,7 +205,8 @@ static void render_sprites() {
     if (spalsel || psel)
       pal1 = (vram + 0x1C00 + 32 * palette);
     vt_blit(sp_width, sp_height, tempbuf, layer_width, layer_height,
-            layer_width, x, y, layers[layer], ColourMode::IDX_16, pal0, pal1);
+            layer_width, x, y, layers[layer * 3], ColourMode::IDX_16, pal0,
+            pal1);
   }
 }
 
@@ -237,51 +239,55 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
     uint16_t base = 0;
     uint16_t offset = ((tx % 32) + 32 * (ty % 32)) * 2;
     bool mapped = false;
+    tx %= 64;
+    ty %= 64;
     switch (scrl) {
     case SCROLL_FIX:
       base = (y8 == 0 && x8 == 0) ? 0x000 : 0x800;
       mapped = (tx < 32 && ty < 32);
       break;
     case SCROLL_H:
-      base = ((tx > 32) != x8) ? 0x800 : 0x000;
+      base = ((tx > 32) != 0) ? 0x800 : 0x000;
       mapped = ty < 32;
       break;
     case SCROLL_V:
-      base = ((ty > 32) != y8) ? 0x800 : 0x000;
+      base = ((ty > 32) != 0) ? 0x800 : 0x000;
       mapped = tx < 32;
       break;
     case SCROLL_4P:
       assert(false);
       break;
     }
-    return make_pair(base + offset, mapped);
+    return make_pair(base + offset, true);
   } else if (size == 16) {
     uint16_t base = 0;
     uint16_t offset = ((tx % 16) + 16 * (ty % 16)) * 2;
     bool mapped = false;
+    tx %= 32;
+    ty %= 32;
     switch (scrl) {
     case SCROLL_FIX:
       base = (layer << 11) | (y8 << 10) | (x8 << 9);
       mapped = (tx < 16 && ty < 16);
       break;
     case SCROLL_H:
-      base = ((tx > 16) != x8) ? 0x200 : 0x000;
+      base = ((tx > 16) != 0) ? 0x200 : 0x000;
       base |= (layer << 11);
       mapped = ty < 16;
       break;
     case SCROLL_V:
-      base = ((ty > 16) != y8) ? 0x200 : 0x000;
+      base = ((ty > 16) != 0) ? 0x200 : 0x000;
       base |= (layer << 11);
       mapped = tx < 16;
       break;
     case SCROLL_4P:
-      base = ((tx > 16) != x8) ? 0x200 : 0x000;
-      base |= ((ty > 16) != y8) ? 0x400 : 0x000;
+      base = ((tx > 16) != 0) ? 0x200 : 0x000;
+      base |= ((ty > 16) != 0) ? 0x400 : 0x000;
       base |= (layer << 11);
       mapped = true;
       break;
     }
-    return make_pair(base + offset, mapped);
+    return make_pair(base + offset, true);
   } else if (bmp) {
     assert(layer == 0);
     uint16_t base = 0;
@@ -293,20 +299,20 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
       mapped = (tx < 1 && ty < 256);
       break;
     case SCROLL_H:
-      base = ((tx > 1) != x8) ? 0x200 : 0x000;
+      base = ((tx > 1) != 0) ? 0x200 : 0x000;
       mapped = ty < 256;
       break;
     case SCROLL_V:
-      base = ((ty > 256) != y8) ? 0x200 : 0x000;
+      base = ((ty > 256) != 0) ? 0x200 : 0x000;
       mapped = tx < 1;
       break;
     case SCROLL_4P:
-      base = ((tx > 1) != x8) ? 0x200 : 0x000;
-      base |= ((ty > 256) != y8) ? 0x400 : 0x000;
+      base = ((tx > 1) != 0) ? 0x200 : 0x000;
+      base |= ((ty > 256) != 0) ? 0x400 : 0x000;
       mapped = true;
       break;
     }
-    return make_pair(base + offset, mapped);
+    return make_pair(base + offset, true);
   } else {
     assert(false);
   }
@@ -352,28 +358,27 @@ static void render_background(int idx) {
   int yoff = unsigned(ppu_regs_shadow[reg_bkg_y[idx]]);
   if (y8)
     yoff = yoff - 256;
-  // cout << "BKG" << idx << " loc " << xoff << " " << yoff << endl;
+  cout << "BKG" << idx << " loc " << dec << xoff << " " << yoff << endl;
 
   bool bmp =
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
   if (bmp) {
-    // cout << "BMP" << endl;
+    cout << "BMP" << endl;
   }
   BkgScrollMode scrl_mode =
       (BkgScrollMode)((ppu_regs_shadow[reg_bkg_ctrl1[idx]] >> 2) & 0x03);
+  cout << "scrl " << (int)scrl_mode << endl;
   bool line_scroll = get_bit(ppu_regs_shadow[reg_bkg_linescroll], 4 + idx);
   int line_scroll_bank = ppu_regs_shadow[reg_bkg_linescroll] & 0x0F;
-  // cout << "BKG" << idx << " ls " << line_scroll << " " << line_scroll_bank
-  //<< endl;
+  cout << "BKG" << idx << " ls " << line_scroll << " " << line_scroll_bank
+       << endl;
   bool bkx_size = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 0);
   int tile_height = bmp ? 1 : (bkx_size ? 16 : 8);
   int tile_width = bmp ? 256 : (bkx_size ? 16 : 8);
-  int y0 =
-      ((scrl_mode == SCROLL_V || scrl_mode == SCROLL_4P) && !bmp) ? -256 : 0;
-  int x0 =
-      ((scrl_mode == SCROLL_H || scrl_mode == SCROLL_4P) && !bmp) ? -256 : 0;
-  int yn = 256;
-  int xn = 256;
+  int y0 = ((scrl_mode == SCROLL_V || scrl_mode == SCROLL_4P)) ? -512 : -512;
+  int x0 = ((scrl_mode == SCROLL_H || scrl_mode == SCROLL_4P)) ? -512 : -512;
+  int yn = ((scrl_mode == SCROLL_V || scrl_mode == SCROLL_4P)) ? 512 : 512;
+  int xn = ((scrl_mode == SCROLL_H || scrl_mode == SCROLL_4P)) ? 512 : 512;
   uint8_t char_buf[512];
 
   uint16_t seg = ((ppu_regs_shadow[reg_bkg_seg_msb[idx]] & 0x0F) << 8UL) |
@@ -400,7 +405,7 @@ static void render_background(int idx) {
         continue;
       uint16_t pal_bank = 0;
       uint8_t depth = 0;
-      if (bkx_pal) {
+      if (!bkx_pal) {
         depth = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 4) & 0x03;
         pal_bank = (fmt == ColourMode::IDX_16)
                        ? cell_pal_bk
@@ -425,7 +430,8 @@ static void render_background(int idx) {
       if (render_pal1)
         pal1 = (vram + 0x1C00 + palette_offset);
       vt_blit(tile_width, tile_height, char_buf, layer_width, layer_height,
-              layer_width, lx, ly, layers[depth & 0x03], fmt, pal0, pal1);
+              layer_width, lx, ly, layers[(depth & 0x03) * 3 + (2 - idx)], fmt,
+              pal0, pal1);
     }
   }
 }
@@ -473,23 +479,31 @@ static void merge_layers(bool lcd = false) {
   for (int y = 0; y < out_height; y++) {
     for (int x = 0; x < out_width; x++) {
       uint16_t pal0 = 0x8000, pal1 = 0x8000;
-      for (int l = 3; l >= 0; l--) {
+      int pal0_layer = layer_count, pal1_layer = layer_count;
+      for (int l = layer_count - 1; l >= 0; l--) {
         uint32_t raw = layers[l][y * layer_width + x];
         if (!(raw & 0x8000)) {
           pal0 = raw & 0xFFFF;
+          pal0_layer = l;
         }
         if (!(raw & 0x80000000)) {
           pal1 = (raw >> 16) & 0xFFFF;
+          pal1_layer = l;
         }
       }
       uint16_t res = 0x8000;
       if (blend_pal && output_pal0 && output_pal1) {
         res = blend_argb1555(pal0, pal1);
-      }
-      if (output_pal0 && !(pal0 & 0x8000)) {
+      } else if (output_pal0 && output_pal1 && !(pal0 & 0x8000) &&
+                 !(pal1 & 0x8000)) {
+        if (pal1_layer <= pal0_layer) {
+          res = pal1;
+        } else {
+          res = pal0;
+        }
+      } else if (output_pal0 && !(pal0 & 0x8000)) {
         res = pal0;
-      }
-      if (output_pal1 && !(pal1 & 0x8000)) {
+      } else if (output_pal1 && !(pal1 & 0x8000)) {
         res = pal1;
       }
       obuf[y * out_width + x] = argb1555_to_rgb8888(res);
@@ -502,7 +516,7 @@ static void clear_layer(uint32_t *ptr, int w, int h) {
 }
 
 static void clear_layers() {
-  for (int i = 0; i < 4; i++)
+  for (int i = 0; i < layer_count - 1; i++)
     clear_layer(layers[i], layer_width, layer_height);
 }
 
@@ -580,7 +594,7 @@ void ppu_init() {
   layer_height = 256;
   for (int i = 0; i < 256; i++)
     ppu_regs[i] = 0;
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < layer_count; i++) {
     layers[i] = new uint32_t[layer_width * layer_height];
   }
   out_width = 256;
