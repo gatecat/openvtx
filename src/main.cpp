@@ -51,6 +51,10 @@ int main(int argc, const char *argv[]) {
           ppu_stop();
           return 0;
           break;
+        case SDL_KEYDOWN:
+          if (event.key.keysym.scancode == SDL_SCANCODE_R)
+            vt168_reset();
+          break;
         }
         vt168_process_event(&event);
       }

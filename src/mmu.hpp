@@ -12,6 +12,7 @@ extern uint8_t control_reg[256];
 extern uint8_t cpu_ram[8192];
 
 void mmu_init();
+void mmu_reset();
 void load_rom(const string &filename);
 uint8_t read_mem_virtual(uint16_t addr);
 void write_mem_virtual(uint16_t addr, uint8_t data);

@@ -256,21 +256,17 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
   if (size == 8) {
     uint16_t base = 0;
     uint16_t offset = ((tx % 32) + 32 * (ty % 32)) * 2;
-    bool mapped = false;
     tx %= 64;
     ty %= 64;
     switch (scrl) {
     case SCROLL_FIX:
       base = (y8 == 0 && x8 == 0) ? 0x000 : 0x800;
-      mapped = (tx < 32 && ty < 32);
       break;
     case SCROLL_H:
       base = ((tx >= 32) != 0) ? 0x800 : 0x000;
-      mapped = ty < 32;
       break;
     case SCROLL_V:
       base = ((ty >= 32) != 0) ? 0x800 : 0x000;
-      mapped = tx < 32;
       break;
     case SCROLL_4P:
       assert(false);
@@ -280,29 +276,24 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
   } else if (size == 16) {
     uint16_t base = 0;
     uint16_t offset = ((tx % 16) + 16 * (ty % 16)) * 2;
-    bool mapped = false;
     tx %= 32;
     ty %= 32;
     switch (scrl) {
     case SCROLL_FIX:
       base = (layer << 11) | (y8 << 10) | (x8 << 9);
-      mapped = (tx < 16 && ty < 16);
       break;
     case SCROLL_H:
       base = ((tx >= 16) != 0) ? 0x200 : 0x000;
       base |= (layer << 11);
-      mapped = ty < 16;
       break;
     case SCROLL_V:
       base = ((ty >= 16) != 0) ? 0x200 : 0x000;
       base |= (layer << 11);
-      mapped = tx < 16;
       break;
     case SCROLL_4P:
       base = ((tx >= 16) != 0) ? 0x200 : 0x000;
       base |= ((ty >= 16) != 0) ? 0x400 : 0x000;
       base |= (layer << 11);
-      mapped = true;
       break;
     }
     return make_pair(base + offset, true);
@@ -310,24 +301,19 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
     assert(layer == 0);
     uint16_t base = 0;
     uint16_t offset = (ty % 256) * 2;
-    bool mapped = false;
     switch (scrl) {
     case SCROLL_FIX:
       base = (layer << 11) | (y8 << 10) | (x8 << 9);
-      mapped = (tx < 1 && ty < 256);
       break;
     case SCROLL_H:
       base = ((tx >= 1) != 0) ? 0x200 : 0x000;
-      mapped = ty < 256;
       break;
     case SCROLL_V:
       base = ((ty >= 256) != 0) ? 0x200 : 0x000;
-      mapped = tx < 1;
       break;
     case SCROLL_4P:
       base = ((tx >= 1) != 0) ? 0x200 : 0x000;
       base |= ((ty >= 256) != 0) ? 0x400 : 0x000;
-      mapped = true;
       break;
     }
     return make_pair(base + offset, true);
@@ -338,8 +324,8 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
 
 // Render the given background layer (idx = [0, 1])
 static void render_background(int idx) {
-  if (get_bit(ppu_regs_shadow[0x01], 0))
-    cout << "BK_INI" << endl;
+  /*if (get_bit(ppu_regs_shadow[0x01], 0))
+    cout << "BK_INI" << endl;*/
   bool en = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 7);
   if (!en)
     return;
@@ -349,7 +335,7 @@ static void render_background(int idx) {
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl1[idx]], 4) : false;
   int bkx_clr = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 2) & 0x03;
   if (hclr) {
-    cout << "HCLR" << endl;
+    // cout << "HCLR" << endl;
     fmt = ColourMode::ARGB1555;
   } else {
     switch (bkx_clr) { // check, datasheet doesn't specify
@@ -378,35 +364,36 @@ static void render_background(int idx) {
   int yoff = unsigned(ppu_regs_shadow[reg_bkg_y[idx]]);
   if (y8)
     yoff = yoff - 256;
-  cout << "BKG" << idx << " loc " << dec << xoff << " " << yoff << endl;
+  // cout << "BKG" << idx << " loc " << dec << xoff << " " << yoff << endl;
 
   bool bmp =
       (idx == 1) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
   if (bmp) {
-    cout << "BMP" << endl;
+    // cout << "BMP" << endl;
   }
   BkgScrollMode scrl_mode =
       (BkgScrollMode)((ppu_regs_shadow[reg_bkg_ctrl1[idx]] >> 2) & 0x03);
-  cout << "scrl " << (int)scrl_mode << endl;
+  // cout << "scrl " << (int)scrl_mode << endl;
   bool line_scroll = get_bit(ppu_regs_shadow[reg_bkg_linescroll], 4 + idx);
   int line_scroll_bank = ppu_regs_shadow[reg_bkg_linescroll] & 0x0F;
-  cout << "BKG" << idx << " ls " << line_scroll << " " << line_scroll_bank
-       << endl;
+  // cout << "BKG" << idx << " ls " << line_scroll << " " << line_scroll_bank
+  //     << endl;
   bool bkx_size = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 0);
   int tile_height = bmp ? 1 : (bkx_size ? 16 : 8);
   int tile_width = bmp ? 256 : (bkx_size ? 16 : 8);
-  int y0 = ((scrl_mode == SCROLL_V || scrl_mode == SCROLL_4P)) ? -512 : -512;
-  int x0 = ((scrl_mode == SCROLL_H || scrl_mode == SCROLL_4P)) ? -512 : -512;
-  int yn = ((scrl_mode == SCROLL_V || scrl_mode == SCROLL_4P)) ? 512 : 512;
-  int xn = ((scrl_mode == SCROLL_H || scrl_mode == SCROLL_4P)) ? 512 : 512;
+  int y0 = -512;
+  int x0 = -512;
+  int yn = 512;
+  int xn = 512;
   uint8_t char_buf[512];
 
   uint16_t seg = ((ppu_regs_shadow[reg_bkg_seg_msb[idx]] & 0x0F) << 8UL) |
                  ppu_regs_shadow[reg_bkg_seg_lsb[idx]];
 
   int scale = (ppu_regs_shadow[reg_bkg_scale] >> (2 * idx)) & 0x03;
-  cout << "ctrl1: " << hex << (int)ppu_regs_shadow[reg_bkg_ctrl1[idx]] << endl;
-  cout << "ctrl2: " << hex << (int)ppu_regs_shadow[reg_bkg_ctrl2[idx]] << endl;
+  // cout << "ctrl1: " << hex << (int)ppu_regs_shadow[reg_bkg_ctrl1[idx]] <<
+  // endl;  cout << "ctrl2: " << hex << (int)ppu_regs_shadow[reg_bkg_ctrl2[idx]]
+  // << endl;
 
   for (int y = (y0 - (tile_height - 1)); y < (yn + tile_height);
        y += tile_height) {
@@ -709,5 +696,14 @@ void ppu_write(uint8_t address, uint8_t data) {
 }
 
 bool ppu_nmi_enabled() { return get_bit(ppu_regs[0], 0); }
+
+void ppu_reset() {
+  for (int i = 0; i < 256; i++)
+    ppu_regs[i] = 0;
+  for (int i = 0; i < 2048; i++)
+    spram[i] = 0;
+  for (int i = 0; i < 8192; i++)
+    vram[i] = 0;
+}
 
 } // namespace VTxx

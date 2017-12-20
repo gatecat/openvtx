@@ -218,4 +218,12 @@ void vt168_process_event(SDL_Event *ev) {
   }
 }
 
+void vt168_reset() {
+  mmu_reset();
+  ppu_reset();
+  cpu_dma->reset();
+  scpu->Reset();
+  cpu->Reset();
+}
+
 }; // namespace VTxx

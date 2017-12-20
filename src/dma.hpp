@@ -15,6 +15,8 @@ public:
 
   inline bool is_busy() { return waiting_vblank; }
 
+  void reset();
+
 private:
   bool waiting_vblank = false;
   uint8_t dma_regs[7] = {0};

@@ -10,7 +10,7 @@ namespace VTxx {
 
 void ppu_init();
 void ppu_stop();
-
+void ppu_reset();
 // Call once every four clocks (i.e. once every cpu tick)
 void ppu_tick();
 

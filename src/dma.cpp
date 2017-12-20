@@ -90,4 +90,11 @@ void DMACtrl::vblank_notify() {
   }
 }
 
+void DMACtrl::reset() {
+  for (int i = 0; i < 7; i++) {
+    dma_regs[i] = 0;
+  }
+  waiting_vblank = false;
+}
+
 } // namespace VTxx

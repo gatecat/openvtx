@@ -31,13 +31,13 @@ void MiWi2Input::process_event(SDL_Event *ev) {
   switch (ev->type) {
   case SDL_KEYDOWN:
     if (keys.find(ev->key.keysym.scancode) != keys.end()) {
-      cout << "keydown " << keys.at(ev->key.keysym.scancode) << endl;
+      // cout << "keydown " << keys.at(ev->key.keysym.scancode) << endl;
       btn_state |= (1 << keys.at(ev->key.keysym.scancode));
     }
     break;
   case SDL_KEYUP:
     if (keys.find(ev->key.keysym.scancode) != keys.end()) {
-      cout << "keyup " << keys.at(ev->key.keysym.scancode) << endl;
+      // cout << "keyup " << keys.at(ev->key.keysym.scancode) << endl;
       btn_state &= ~(1 << keys.at(ev->key.keysym.scancode));
     }
     break;

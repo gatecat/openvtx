@@ -27,6 +27,12 @@ void mmu_init() {
   }
 }
 
+void mmu_reset() {
+  for (int i = 0; i < 256; i++) {
+    control_reg[i] = 0x0;
+  }
+}
+
 void load_rom(const string &filename) {
   ifstream romf(filename);
   if (!romf) {

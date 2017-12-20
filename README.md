@@ -1,8 +1,7 @@
 # OpenVTx Emulator for VR Tech Systems
 
 OpenVTx is an emulator for the 6502-based, NES-inspired VR Technology based game systems. At the moment
-it is a very early work in progress, currently having only limited PPU emulation, no sound output support
-and most importantly no working input support. 
+it is an early work in progress, currently having some PPU rendering issues and no sound emulation.
 
 Currently the focus is on the VT168 processor and the MiWi2 Wii clone. Support for the VT368 and other
 platforms will hopefully be added in the future.
@@ -20,3 +19,9 @@ openvtx platform filename.bin
 
 Where `platform` is the name of the platform (currently `vt168` for a minimal VT168 system or `miwi2` for the MiWi2), and
 `filename.bin` is the path of the ROM to load.
+
+The key bindings are as follows:
+ - Up/Down/Left/Right cursor keys map to the D-pad
+ - Enter maps to start and R-Shift maps to select
+ - Z maps to B and X maps to A
+ - R is a soft reset (possibly buggy)
