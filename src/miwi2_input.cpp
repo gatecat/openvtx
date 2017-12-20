@@ -23,8 +23,8 @@ uint8_t MiWi2Input::read(uint8_t addr) {
 }
 // Map keys to input bits
 static const map<SDL_Scancode, int> keys = {
-    {SDL_SCANCODE_X, 7},      {SDL_SCANCODE_Z, 6},    {SDL_SCANCODE_RSHIFT, 2},
-    {SDL_SCANCODE_RETURN, 4}, {SDL_SCANCODE_UP, 3},   {SDL_SCANCODE_DOWN, 5},
+    {SDL_SCANCODE_X, 7},      {SDL_SCANCODE_Z, 6},    {SDL_SCANCODE_RSHIFT, 5},
+    {SDL_SCANCODE_RETURN, 4}, {SDL_SCANCODE_UP, 3},   {SDL_SCANCODE_DOWN, 2},
     {SDL_SCANCODE_LEFT, 1},   {SDL_SCANCODE_RIGHT, 0}};
 
 void MiWi2Input::process_event(SDL_Event *ev) {

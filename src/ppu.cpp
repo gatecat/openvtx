@@ -35,18 +35,26 @@ static thread ppu_thread;
 
 enum class ColourMode { IDX_4, IDX_16, IDX_64, IDX_256, ARGB1555 };
 
+static const int hflip = 0x01;
+static const int vflip = 0x02;
+static const int scale_2x = 0x03;
+static const int scale_1x5 = 0x02;
 // Our custom (slow) blitting function
 static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
                     int dst_height, int dst_stride, int dst_x, int dst_y,
-                    uint32_t *dst, ColourMode fmt,
+                    int flip, int scale, uint32_t *dst, ColourMode fmt,
                     volatile uint8_t *pal0 = nullptr,
                     volatile uint8_t *pal1 = nullptr) {
   uint8_t *srcptr = src;
   int src_bit = 0;
   for (int sy = 0; sy < src_height; sy++) {
     int dy = dst_y + sy;
+    if (flip & vflip)
+      dy = dst_y + (src_height - sy) + 1;
     for (int sx = 0; sx < src_width; sx++) {
       int dx = dst_x + sx;
+      if (flip & hflip)
+        dx = dst_x + (src_width - sx) + 1;
       uint16_t argb0 = 0x8000, argb1 = 0x8000;
       if (fmt == ColourMode::ARGB1555) {
         argb0 = (*(srcptr + 1) << 8UL) | (*srcptr);
@@ -112,14 +120,23 @@ static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
             argb1 = (pal1[2 * raw + 1] << 8) | pal1[2 * raw];
         }
       }
-      if ((dx >= 0) && (dx < dst_width) && (dy >= 0) && (dy < dst_height)) {
-        if (!(argb0 & 0x8000)) {
-          dst[dy * dst_stride + dx] =
-              (dst[dy * dst_stride + dx] & 0xFFFF0000) | argb0;
-        }
-        if (!(argb1 & 0x8000)) {
-          dst[dy * dst_stride + dx] =
-              (dst[dy * dst_stride + dx] & 0x0000FFFF) | (argb1 << 16UL);
+      int scaled_dy = scale == scale_2x
+                          ? (dy * 2)
+                          : (scale == scale_1x5 ? ((dy * 3) / 2) : dy);
+      int dy_extent =
+          (scale == scale_2x || (scale == scale_1x5 && ((dy % 1) == 1)))
+              ? (scaled_dy + 1)
+              : scaled_dy;
+      for (int sdy = scaled_dy; sdy <= dy_extent; sdy++) {
+        if ((dx >= 0) && (dx < dst_width) && (sdy >= 0) && (sdy < dst_height)) {
+          if (!(argb0 & 0x8000)) {
+            dst[sdy * dst_stride + dx] =
+                (dst[sdy * dst_stride + dx] & 0xFFFF0000) | argb0;
+          }
+          if (!(argb1 & 0x8000)) {
+            dst[sdy * dst_stride + dx] =
+                (dst[sdy * dst_stride + dx] & 0x0000FFFF) | (argb1 << 16UL);
+          }
         }
       }
     }
@@ -162,7 +179,7 @@ static void get_char_data(uint16_t seg, uint16_t vector, int w, int h,
   else
     spacing *= bpp;
   spacing /= 8;
-  uint32_t pa = (seg << 13UL) + vector * spacing;
+  uint32_t pa = (seg << 13UL) + uint32_t(vector) * uint32_t(spacing);
   //  cout << "pa = 0x" << hex << pa << endl;
   int len = (w * h * bpp) / 8;
   for (int i = 0; i < len; i++)
@@ -177,8 +194,8 @@ static void render_sprites() {
     return;
   bool spalsel = get_bit(ppu_regs_shadow[reg_sp_ctrl], 3);
   int sp_size = ppu_regs_shadow[reg_sp_ctrl] & 0x03;
-  int sp_width = (sp_size == 2 || sp_size == 3) ? 16 : 8;
-  int sp_height = (sp_size == 1 || sp_size == 3) ? 16 : 8;
+  int sp_width = (sp_size == 1 || sp_size == 3) ? 16 : 8;
+  int sp_height = (sp_size == 2 || sp_size == 3) ? 16 : 8;
   uint16_t sp_seg = (ppu_regs_shadow[reg_sp_seg_msb] & 0x0F) << 8 |
                     ppu_regs_shadow[reg_sp_seg_lsb];
 
@@ -205,8 +222,8 @@ static void render_sprites() {
     if (spalsel || psel)
       pal1 = (vram + 0x1C00 + 32 * palette);
     vt_blit(sp_width, sp_height, tempbuf, layer_width, layer_height,
-            layer_width, x, y, layers[layer * 3], ColourMode::IDX_16, pal0,
-            pal1);
+            layer_width, x, y, (spdata[3] >> 1) & 0x03, 0, layers[layer * 3],
+            ColourMode::IDX_16, pal0, pal1);
   }
 }
 
@@ -218,6 +235,7 @@ const int reg_bkg_linescroll = 0x20;
 const int reg_bkg_ctrl2[2] = {0x13, 0x17};
 
 const int reg_bkg_pal_sel = 0x0F;
+const int reg_bkg_scale = 0x19;
 
 const int reg_bkg_seg_lsb[2] = {0x1C, 0x1E};
 const int reg_bkg_seg_msb[2] = {0x1D, 0x1F};
@@ -363,7 +381,7 @@ static void render_background(int idx) {
   cout << "BKG" << idx << " loc " << dec << xoff << " " << yoff << endl;
 
   bool bmp =
-      (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
+      (idx == 1) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
   if (bmp) {
     cout << "BMP" << endl;
   }
@@ -385,6 +403,10 @@ static void render_background(int idx) {
 
   uint16_t seg = ((ppu_regs_shadow[reg_bkg_seg_msb[idx]] & 0x0F) << 8UL) |
                  ppu_regs_shadow[reg_bkg_seg_lsb[idx]];
+
+  int scale = (ppu_regs_shadow[reg_bkg_scale] >> (2 * idx)) & 0x03;
+  cout << "ctrl1: " << hex << (int)ppu_regs_shadow[reg_bkg_ctrl1[idx]] << endl;
+  cout << "ctrl2: " << hex << (int)ppu_regs_shadow[reg_bkg_ctrl2[idx]] << endl;
 
   for (int y = (y0 - (tile_height - 1)); y < (yn + tile_height);
        y += tile_height) {
@@ -434,8 +456,8 @@ static void render_background(int idx) {
       if (render_pal1)
         pal1 = (vram + 0x1C00 + palette_offset);
       vt_blit(tile_width, tile_height, char_buf, layer_width, layer_height,
-              layer_width, lx, ly, layers[(depth & 0x03) * 3 + (2 - idx)], fmt,
-              pal0, pal1);
+              layer_width, lx, ly, 0, scale,
+              layers[(depth & 0x03) * 3 + (2 - idx)], fmt, pal0, pal1);
     }
   }
 }
@@ -460,9 +482,9 @@ static inline uint8_t c5_to_8(uint8_t x) {
 }
 
 static inline uint32_t argb1555_to_rgb8888(uint16_t x) {
-  uint8_t r = x & 0x1F;
+  uint8_t b = x & 0x1F;
   uint8_t g = (x >> 5) & 0x1F;
-  uint8_t b = (x >> 10) & 0x1F;
+  uint8_t r = (x >> 10) & 0x1F;
   bool a = get_bit(x, 15);
   if (a)
     return 0xFF000000;
