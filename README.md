@@ -20,9 +20,22 @@ openvtx platform filename.bin
 Where `platform` is the name of the platform (currently `vt168` for a minimal VT168 system or `miwi2` for the MiWi2), and
 `filename.bin` is the path of the ROM to load.
 
+A simple WxWidgets GUI will be used for platform and ROM selection if it is run without arguments.
+
 The key bindings are as follows:
  - Up/Down/Left/Right cursor keys map to the D-pad
  - Enter maps to start and R-Shift maps to select
  - Z maps to B and X maps to A
  - R is a soft reset (possibly buggy)
  
+# Known Issues
+ - No sound emulation (SCPU is partially emulated but no sound output support)
+ - The road is missing (corruped background layer is visible instead) in the "3D" perspective racing games
+ - Poor input device emulation means only the first two games can be selected in the InterAct 8-in-1 ROM
+ 
+# Supported ROMs
+  - VRT VT1682 demo ROM (use `vt168` platform)
+  - MiWi 2 Sports 7 in 1 (use `miwi2` platform)
+  - MiWi 2 16 Arcade Games + Drum Master (use `miwi2` platform)
+  - InterAct 8-in-1 (use `miwi2` platform, note above input issue)
+  - InterAct 32-in-1 (use `miwi2` platform)
