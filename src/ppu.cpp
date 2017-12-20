@@ -247,11 +247,11 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
       mapped = (tx < 32 && ty < 32);
       break;
     case SCROLL_H:
-      base = ((tx > 32) != 0) ? 0x800 : 0x000;
+      base = ((tx >= 32) != 0) ? 0x800 : 0x000;
       mapped = ty < 32;
       break;
     case SCROLL_V:
-      base = ((ty > 32) != 0) ? 0x800 : 0x000;
+      base = ((ty >= 32) != 0) ? 0x800 : 0x000;
       mapped = tx < 32;
       break;
     case SCROLL_4P:
@@ -271,18 +271,18 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
       mapped = (tx < 16 && ty < 16);
       break;
     case SCROLL_H:
-      base = ((tx > 16) != 0) ? 0x200 : 0x000;
+      base = ((tx >= 16) != 0) ? 0x200 : 0x000;
       base |= (layer << 11);
       mapped = ty < 16;
       break;
     case SCROLL_V:
-      base = ((ty > 16) != 0) ? 0x200 : 0x000;
+      base = ((ty >= 16) != 0) ? 0x200 : 0x000;
       base |= (layer << 11);
       mapped = tx < 16;
       break;
     case SCROLL_4P:
-      base = ((tx > 16) != 0) ? 0x200 : 0x000;
-      base |= ((ty > 16) != 0) ? 0x400 : 0x000;
+      base = ((tx >= 16) != 0) ? 0x200 : 0x000;
+      base |= ((ty >= 16) != 0) ? 0x400 : 0x000;
       base |= (layer << 11);
       mapped = true;
       break;
@@ -299,16 +299,16 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
       mapped = (tx < 1 && ty < 256);
       break;
     case SCROLL_H:
-      base = ((tx > 1) != 0) ? 0x200 : 0x000;
+      base = ((tx >= 1) != 0) ? 0x200 : 0x000;
       mapped = ty < 256;
       break;
     case SCROLL_V:
-      base = ((ty > 256) != 0) ? 0x200 : 0x000;
+      base = ((ty >= 256) != 0) ? 0x200 : 0x000;
       mapped = tx < 1;
       break;
     case SCROLL_4P:
-      base = ((tx > 1) != 0) ? 0x200 : 0x000;
-      base |= ((ty > 256) != 0) ? 0x400 : 0x000;
+      base = ((tx >= 1) != 0) ? 0x200 : 0x000;
+      base |= ((ty >= 256) != 0) ? 0x400 : 0x000;
       mapped = true;
       break;
     }
@@ -320,6 +320,8 @@ static pair<uint16_t, bool> get_tile_addr(int tx, int ty, bool y8, bool x8,
 
 // Render the given background layer (idx = [0, 1])
 static void render_background(int idx) {
+  if (get_bit(ppu_regs_shadow[0x01], 0))
+    cout << "BK_INI" << endl;
   bool en = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 7);
   if (!en)
     return;
@@ -329,7 +331,7 @@ static void render_background(int idx) {
       (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl1[idx]], 4) : false;
   int bkx_clr = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 2) & 0x03;
   if (hclr) {
-    // cout << "HCLR" << endl;
+    cout << "HCLR" << endl;
     fmt = ColourMode::ARGB1555;
   } else {
     switch (bkx_clr) { // check, datasheet doesn't specify
@@ -384,8 +386,10 @@ static void render_background(int idx) {
   uint16_t seg = ((ppu_regs_shadow[reg_bkg_seg_msb[idx]] & 0x0F) << 8UL) |
                  ppu_regs_shadow[reg_bkg_seg_lsb[idx]];
 
-  for (int y = y0; y < yn; y += tile_height) {
-    for (int x = x0; x < xn; x += tile_width) {
+  for (int y = (y0 - (tile_height - 1)); y < (yn + tile_height);
+       y += tile_height) {
+    for (int x = (x0 - (tile_width - 1)); x < (xn + tile_width);
+         x += tile_width) {
       int lx = x + xoff;
       int ly = y + yoff;
       int tx = (x - x0) / tile_width;
