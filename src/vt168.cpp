@@ -134,6 +134,26 @@ void vt168_init(VT168_Platform plat, const std::string &rom) {
     reg_read_fn[0x0F] = [](uint16_t a) { return mw2inp->read(1); };
   }
 
+  reg_write_fn[0x1C] = [](uint16_t a, uint8_t b) {
+    control_reg[0x1C] = b;
+    scpu_irq->set_irq(3, get_bit(b, 4));
+  };
+
+  reg_read_fn[0x1C] = [](uint16_t a) {
+    return control_reg[0x1C];
+    cpu_irq->set_irq(3, false);
+  };
+
+  scpu_reg_write_fn[0x1C] = [](uint16_t a, uint8_t b) {
+    scpu_control_reg[0x1c] = b;
+    cpu_irq->set_irq(2, get_bit(b, 4));
+  };
+
+  scpu_reg_read_fn[0x1C] = [](uint16_t a) {
+    scpu_irq->set_irq(3, 0);
+    return scpu_control_reg[0x1c];
+  };
+
   // TODO: init misc control regs
 
   cpu->Reset();
@@ -191,6 +211,8 @@ bool vt168_tick() {
       if (ppu_nmi_enabled()) {
         // cout << "-- NMI --" << endl;
         cpu->NMI();
+        if (get_bit(scpu_control_reg[0x1C], 1))
+          scpu->NMI();
       }
       if (chrono::duration<double>(chrono::system_clock::now() - last_update)
               .count() > 0.5) {

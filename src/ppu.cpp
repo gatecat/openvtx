@@ -201,11 +201,13 @@ static void render_sprites() {
                     ppu_regs_shadow[reg_sp_seg_lsb];
 
   uint8_t tempbuf[16 * 16];
+  int spcnt = 0;
   for (int idx = 239; idx >= 0; idx--) {
     volatile uint8_t *spdata = spram + 8 * idx;
     uint16_t vector = ((spdata[1] & 0x0F) << 8UL) | spdata[0];
     if (vector == 0)
       continue;
+    spcnt++;
     int layer = (spdata[3] >> 3) & 0x03;
     int palette = (spdata[1] >> 4) & 0x0F;
     bool psel = get_bit(spdata[5], 1);
@@ -225,7 +227,10 @@ static void render_sprites() {
     vt_blit(sp_width, sp_height, tempbuf, layer_width, layer_height,
             layer_width, x, y, (spdata[3] >> 1) & 0x03, 0, layers[layer * 3],
             ColourMode::IDX_16, pal0, pal1);
+    /*  if (get_bit(spdata[5], 2))
+        cout << "vrch" << endl;*/
   }
+  // cout << spcnt << endl;
 }
 
 const int reg_bkg_x[2] = {0x10, 0x14};

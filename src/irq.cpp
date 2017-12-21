@@ -25,8 +25,9 @@ void IRQController::set_irq(int idx, bool new_status) {
     if (get_bit(msk_reg, idx)) {
       if (!status[idx]) {
         status[idx] = true;
-        cout << "--- IRQ " << idx << " (0x" << hex << vectors[idx].h << ", 0x"
-             << vectors[idx].l << ")" << endl;
+        // cout << "--- IRQ " << idx << " (0x" << hex << vectors[idx].h << ",
+        // 0x"
+        //     << vectors[idx].l << ")" << endl;
         cpu->IRQ(vectors[idx].h, vectors[idx].l);
       }
     }

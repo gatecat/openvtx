@@ -87,9 +87,9 @@ void Timer::tick() {
     tsyn_div += 1;
     if (tsyn_div >= 340) {
       tsyn_div = 0;
-      do_tick = false;
-    } else {
       do_tick = true;
+    } else {
+      do_tick = false;
     }
   } else {
     do_tick = true;
@@ -99,6 +99,8 @@ void Timer::tick() {
       if (get_bit(config, 1))
         cb(true);
       count = preload;
+    } else {
+      count++;
     }
   }
 }
