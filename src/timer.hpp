@@ -23,6 +23,7 @@ private:
   uint8_t config = 0;
   bool tsynen = false;
   int tsyn_div = 0;
+  bool last_vblank = false;
 };
 
 } // namespace VTxx

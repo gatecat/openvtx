@@ -1,4 +1,5 @@
 #include "timer.hpp"
+#include "ppu.hpp"
 #include "util.hpp"
 #include <cassert>
 namespace VTxx {
@@ -11,18 +12,22 @@ void Timer::write(uint8_t addr, uint8_t data) {
     case 0x0:
       preload &= 0xFF00;
       preload |= data;
+      count = preload;
       break;
     case 0x3:
       preload &= 0x00FF;
       preload |= (data << 8UL);
+      count = preload;
       break;
     case 0x1:
+      count = preload;
       config = data;
       break;
     case 0x2:
       cb(false);
       break;
     case 0xA:
+      count = preload;
       tsynen = get_bit(data, 7);
       tsyn_div = 0;
       break;
@@ -34,12 +39,15 @@ void Timer::write(uint8_t addr, uint8_t data) {
     case 0x0:
       preload &= 0xFF00;
       preload |= data;
+      count = preload;
       break;
     case 0x1:
       preload &= 0x00FF;
       preload |= (data << 8UL);
+      count = preload;
       break;
     case 0x2:
+      count = preload;
       config = data;
       break;
     case 0x3:
@@ -84,13 +92,10 @@ uint8_t Timer::read(uint8_t addr) {
 void Timer::tick() {
   bool do_tick = false;
   if (tsynen) {
-    tsyn_div += 1;
-    if (tsyn_div >= 340) {
-      tsyn_div = 0;
-      do_tick = true;
-    } else {
-      do_tick = false;
-    }
+    if (ppu_is_vblank() && !last_vblank)
+      count = preload;
+    last_vblank = ppu_is_vblank();
+    do_tick = ppu_is_hbegin() && (ppu_get_vcnt() > 35);
   } else {
     do_tick = true;
   }
