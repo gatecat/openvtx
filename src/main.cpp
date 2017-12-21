@@ -3,6 +3,7 @@
 #include "mmu.hpp"
 #include "ppu.hpp"
 #include "vt168.hpp"
+#include <ctime>
 #include <iomanip>
 #include <iostream>
 using namespace std;
@@ -43,9 +44,19 @@ int main(int argc, char *argv[]) {
        << (read_mem_virtual(0xfffd) << 8UL | read_mem_virtual(0xfffc)) << endl;
   bool last_render_done = false;
   SDL_Event event;
+  bool screenshot_pending = false;
   while (true) {
     vt168_tick();
     if (ppu_is_render_done() && !last_render_done) {
+      if (screenshot_pending) {
+        screenshot_pending = false;
+        char timestring[30];
+        time_t now = time(nullptr);
+        strftime(timestring, 29, "%Y%m%d_%H%M%S", localtime(&now));
+        string filename =
+            string("screenshot_") + string(timestring) + string(".bmp");
+        ppu_write_screenshot(filename);
+      }
       // Process events
       while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -56,6 +67,8 @@ int main(int argc, char *argv[]) {
         case SDL_KEYDOWN:
           if (event.key.keysym.scancode == SDL_SCANCODE_R)
             vt168_reset();
+          if (event.key.keysym.scancode == SDL_SCANCODE_F12)
+            screenshot_pending = true;
           break;
         }
         vt168_process_event(&event);

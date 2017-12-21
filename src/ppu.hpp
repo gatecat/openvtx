@@ -1,6 +1,7 @@
 #ifndef PPU_H
 #define PPU_H
 #include <cstdint>
+#include <string>
 
 using namespace std;
 
@@ -24,6 +25,8 @@ bool ppu_nmi_enabled();
 
 // Return the PPU output as a 256x240 ARGB buffer
 uint32_t *get_render_buffer();
+
+void ppu_write_screenshot(string filename);
 
 } // namespace VTxx
 
