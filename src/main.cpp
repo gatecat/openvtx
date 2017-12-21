@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
        << (read_mem_virtual(0xfffd) << 8UL | read_mem_virtual(0xfffc)) << endl;
   bool last_render_done = false;
   SDL_Event event;
-  bool screenshot_pending = false;
+  bool screenshot_pending = false, tiledump_pending = false;
   while (true) {
     vt168_tick();
     if (ppu_is_render_done() && !last_render_done) {
@@ -56,6 +56,14 @@ int main(int argc, char *argv[]) {
         string filename =
             string("screenshot_") + string(timestring) + string(".bmp");
         ppu_write_screenshot(filename);
+      }
+      if (tiledump_pending) {
+        tiledump_pending = false;
+        char timestring[30];
+        time_t now = time(nullptr);
+        strftime(timestring, 29, "%Y%m%d_%H%M%S", localtime(&now));
+        string filename = string("tilemap_") + string(timestring);
+        ppu_dump_tilemaps(filename);
       }
       // Process events
       while (SDL_PollEvent(&event)) {
@@ -69,6 +77,8 @@ int main(int argc, char *argv[]) {
             vt168_reset();
           if (event.key.keysym.scancode == SDL_SCANCODE_F12)
             screenshot_pending = true;
+          if (event.key.keysym.scancode == SDL_SCANCODE_F11)
+            tiledump_pending = true;
           break;
         }
         vt168_process_event(&event);

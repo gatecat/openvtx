@@ -749,6 +749,112 @@ void ppu_write_screenshot(string filename) {
   write_bmp(filename, out_width, out_height, obuf);
 }
 
+void ppu_dump_tilemaps(string basename) {
+  for (int idx = 0; idx <= 1; idx++) {
+
+    bool en = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 7);
+    if (!en)
+      continue;
+    bool bkx_pal = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 6);
+    ColourMode fmt;
+    bool hclr =
+        (idx == 0) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl1[idx]], 4) : false;
+    int bkx_clr = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 2) & 0x03;
+    if (hclr) {
+      // cout << "HCLR" << endl;
+      fmt = ColourMode::ARGB1555;
+    } else {
+      switch (bkx_clr) { // check, datasheet doesn't specify
+      case 0:
+        fmt = ColourMode::IDX_4;
+        break;
+      case 1:
+        fmt = ColourMode::IDX_16;
+        break;
+      case 2:
+        fmt = ColourMode::IDX_64;
+        break;
+      case 3:
+        fmt = ColourMode::IDX_256;
+        break;
+      }
+    }
+
+    bool render_pal0 = get_bit(ppu_regs_shadow[reg_bkg_pal_sel], 0 + 2 * idx);
+    bool render_pal1 = get_bit(ppu_regs_shadow[reg_bkg_pal_sel], 1 + 2 * idx);
+
+    bool bmp =
+        (idx == 1) ? get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 1) : false;
+
+    bool bkx_size = get_bit(ppu_regs_shadow[reg_bkg_ctrl2[idx]], 0);
+    int tile_height = bmp ? 1 : (bkx_size ? 16 : 8);
+    int tile_width = bmp ? 256 : (bkx_size ? 16 : 8);
+
+    uint8_t char_buf[512];
+
+    uint16_t seg = ((ppu_regs_shadow[reg_bkg_seg_msb[idx]] & 0x0F) << 8UL) |
+                   ppu_regs_shadow[reg_bkg_seg_lsb[idx]];
+    int map_size = 0x2000;
+    int line_width = 256;
+    int height = (map_size / (2 * (line_width / tile_width))) * tile_height;
+    uint32_t *layerbuf = new uint32_t[line_width * height];
+    for (int y = 0; y < height; y += tile_height) {
+      for (int x = 0; x < line_width; x += tile_width) {
+        int addr = 2 * (((y / tile_height) * (line_width / tile_width)) +
+                        (x / tile_width));
+        uint16_t cell = (vram[addr + 1] << 8UL) | vram[addr];
+        uint16_t vector = cell & 0xFFF;
+        uint8_t cell_pal_bk = (cell >> 12) & 0x0F;
+        if (vector == 0) // transparent
+          continue;
+        uint16_t pal_bank = 0;
+        uint8_t depth = 0;
+        if (!bkx_pal) {
+          depth = (ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 4) & 0x03;
+          pal_bank =
+              (fmt == ColourMode::IDX_16)
+                  ? cell_pal_bk
+                  : ((fmt == ColourMode::IDX_64) ? (cell_pal_bk >> 2) : 0);
+        } else {
+          depth = cell_pal_bk & 0x03;
+          pal_bank =
+              (fmt == ColourMode::IDX_16)
+                  ? (((ppu_regs_shadow[reg_bkg_ctrl2[idx]] >> 2) & 0x0C) |
+                     (cell_pal_bk >> 2))
+                  : ((fmt == ColourMode::IDX_64) ? (cell_pal_bk >> 2) : 0);
+        }
+
+        get_char_data(seg, vector, tile_width, tile_height, fmt, bmp, char_buf);
+        // TODO: line scrolling
+        uint16_t palette_offset =
+            (fmt == ColourMode::IDX_16)
+                ? (pal_bank * 32UL)
+                : (fmt == ColourMode::IDX_64 ? (pal_bank * 128UL) : 0);
+        volatile uint8_t *pal0 = nullptr, *pal1 = nullptr;
+        if (render_pal0)
+          pal0 = (vram + 0x1E00 + palette_offset);
+        if (render_pal1)
+          pal1 = (vram + 0x1C00 + palette_offset);
+        vt_blit(tile_width, tile_height, char_buf, line_width, height,
+                line_width, x, y, 0, 0, layerbuf, fmt, pal0, pal1);
+      }
+    }
+    uint32_t *argbbuf = new uint32_t[line_width * height];
+
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < line_width; x++) {
+        argbbuf[y * line_width + x] = argb1555_to_rgb8888(
+            render_pal1 ? ((layerbuf[y * line_width + x] >> 16) & 0xFFFF)
+                        : (layerbuf[y * line_width + x] & 0xFFFF));
+      }
+    }
+    write_bmp(basename + "_bkg" + to_string(idx) + ".bmp", line_width, height,
+              argbbuf);
+    delete[] argbbuf;
+    delete[] layerbuf;
+  }
+}
+
 bool ppu_nmi_enabled() { return get_bit(ppu_regs[0], 0); }
 
 void ppu_reset() {

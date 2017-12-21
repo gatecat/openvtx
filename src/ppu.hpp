@@ -27,7 +27,7 @@ bool ppu_nmi_enabled();
 uint32_t *get_render_buffer();
 
 void ppu_write_screenshot(string filename);
-
+void ppu_dump_tilemaps(string basename);
 } // namespace VTxx
 
 #endif /* end of include guard: PPU_H */
