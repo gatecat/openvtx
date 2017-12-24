@@ -226,7 +226,7 @@ bool vt168_tick() {
       }
       is_vblank = true;
     }
-    if (ppu_is_vblank())
+    if (true)
       cpu_dma->vblank_notify();
     last_vblank = ppu_is_vblank();
   }

@@ -24,6 +24,7 @@ const int layer_count = 3 * 4;
 // how the VT168 works. It consists of two 16-bit words, the MSW for palette
 // bank 1 and the LSW for palette bank 0. Each word is in TRGB1555 format,
 // where the MSb is 1 for transparent and 0 for solid
+// 0x8123 is a special colour, "dig"
 static uint32_t *layers[layer_count];
 static int layer_width, layer_height;
 
@@ -77,9 +78,9 @@ static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
     if (fmt == ColourMode::ARGB1555) {
       argb0 = (*(srcptr + 1) << 8UL) | (*srcptr);
       argb1 = argb0;
-      if (pal0 == nullptr)
+      if (pal0 == nullptr || (argb0 & 0x8000))
         argb0 = 0x8000;
-      if (pal1 == nullptr)
+      if (pal1 == nullptr || (argb1 & 0x8000))
         argb1 = 0x8000;
       srcptr += 2;
     } else {
@@ -132,10 +133,18 @@ static void vt_blit(int src_width, int src_height, uint8_t *src, int dst_width,
         argb0 = 0x8000; // idx 0 is always transparent
         argb1 = 0x8000; // idx 0 is always transparent
       } else {
-        if (pal0 != nullptr)
+        if (pal0 != nullptr) {
           argb0 = (pal0[2 * raw + 1] << 8) | pal0[2 * raw];
-        if (pal1 != nullptr)
+          // Bit 15 is dig, not transparent
+          if (argb0 & 0x8000)
+            argb0 = 0x8123;
+        }
+
+        if (pal1 != nullptr) {
           argb1 = (pal1[2 * raw + 1] << 8) | pal1[2 * raw];
+          if (argb1 & 0x8000)
+            argb1 = 0x8123;
+        }
       }
     }
     int scaled_dy = scale == scale_2x
@@ -519,7 +528,11 @@ static void merge_layers(int y, bool lcd = false) {
       }
     }
     uint16_t res = 0x8000;
-    if (blend_pal && output_pal0 && output_pal1) {
+    if (output_pal0 && output_pal1 && pal1 == 0x8123) {
+      res = pal0;
+    } else if (output_pal0 && output_pal1 && pal0 == 0x8123) {
+      res = pal1;
+    } else if (blend_pal && output_pal0 && output_pal1) {
       res = blend_argb1555(pal0, pal1);
     } else if (output_pal0 && output_pal1 && !(pal0 & 0x8000) &&
                !(pal1 & 0x8000)) {
@@ -661,12 +674,12 @@ const uint8_t reg_vram_data = 0x07;
 
 uint8_t ppu_read(uint8_t address) {
   switch (address) {
-  case reg_spram_data: {
+  case reg_vram_data: {
     uint16_t spram_addr = (ppu_regs[reg_spram_addr_msb] << 3) |
                           (ppu_regs[reg_spram_addr_lsb] & 0x07);
     return spram[spram_addr]; // TODO: are SPRAM and VRAM reads swapped?
   }
-  case reg_vram_data: {
+  case reg_spram_data: {
     uint16_t vram_addr = ((ppu_regs[reg_vram_addr_msb] & 0x1F) << 8) |
                          ppu_regs[reg_vram_addr_lsb];
     // cout << "vram rd " << hex << vram_addr;
