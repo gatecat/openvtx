@@ -381,7 +381,7 @@ static void render_background(int idx, int line) {
   int yoff = unsigned(ppu_regs[reg_bkg_y[idx]]);
   if (y8)
     yoff = yoff - 256;
-  // cout << "BKG" << idx << " loc " << dec << xoff << " " << yoff << endl;
+  cout << "BKG" << idx << " loc " << dec << xoff << " " << yoff << endl;
 
   bool bmp = (idx == 1) ? get_bit(ppu_regs[reg_bkg_ctrl2[idx]], 1) : false;
   if (bmp) {
@@ -389,7 +389,7 @@ static void render_background(int idx, int line) {
   }
   BkgScrollMode scrl_mode =
       (BkgScrollMode)((ppu_regs[reg_bkg_ctrl1[idx]] >> 2) & 0x03);
-  // cout << "scrl " << (int)scrl_mode << endl;
+  cout << "scrl " << (int)scrl_mode << endl;
   bool line_scroll = get_bit(ppu_regs[reg_bkg_linescroll], 4 + idx);
   int line_scroll_bank = ppu_regs[reg_bkg_linescroll] & 0x0F;
   // cout << "BKG" << idx << " ls " << line_scroll << " " << line_scroll_bank
@@ -421,8 +421,7 @@ static void render_background(int idx, int line) {
     }
   }
 
-  for (int x = (x0 - (tile_width - 1)); x < (xn + tile_width);
-       x += tile_width) {
+  for (int x = x0; x < xn; x += tile_width) {
     int lx = x + xoff;
     int tx = (x - x0) / tile_width;
     int ty = (y - y0) / tile_height;
@@ -469,7 +468,7 @@ static void render_background(int idx, int line) {
       pal1 = (vram + 0x1C00 + palette_offset);
     vt_blit(tile_width, tile_height, char_buf, layer_width, layer_height,
             layer_width, lx, ly, 0, scale,
-            layers[(depth & 0x03) * 3 + (2 - idx)], fmt, line, pal0, pal1);
+            layers[(depth & 0x03) * 3 + (1 + idx)], fmt, line, pal0, pal1);
   }
 }
 
@@ -483,7 +482,7 @@ static inline uint16_t blend_argb1555(uint16_t a, uint16_t b) {
   uint16_t x = 0;
   x |= (((a & 0x1F) + (b & 0x1F)) / 2) & 0x1F;
   x |= (((((a >> 5) & 0x1F) + ((b >> 5) & 0x1)) / 2) & 0x1F) << 5;
-  x |= (((((a >> 11) & 0x1F) + ((b >> 11) & 0x1F)) / 2) & 0x1F) << 10;
+  x |= (((((a >> 10) & 0x1F) + ((b >> 10) & 0x1F)) / 2) & 0x1F) << 10;
   return x;
 }
 
@@ -498,7 +497,7 @@ static inline uint32_t argb1555_to_rgb8888(uint16_t x) {
   uint8_t r = (x >> 10) & 0x1F;
   bool a = get_bit(x, 15);
   if (a)
-    return 0xFF000000;
+    return 0xFFFF00FF;
   uint32_t y = 0;
   y |= 0xFF000000;
   y |= c5_to_8(r) << 16UL;
