@@ -18,7 +18,7 @@ uint8_t scpu_read_mem(uint16_t addr) {
     if (scpu_reg_read_fn[reg_addr] != nullptr)
       return scpu_reg_read_fn[reg_addr](addr);
     else
-      return scpu_control_reg[addr];
+      return scpu_control_reg[reg_addr];
   } else {
     assert(false);
   }
@@ -35,7 +35,7 @@ void scpu_write_mem(uint16_t addr, uint8_t data) {
     if (scpu_reg_write_fn[reg_addr] != nullptr)
       scpu_reg_write_fn[reg_addr](addr, data);
     else
-      scpu_control_reg[addr] = data;
+      scpu_control_reg[reg_addr] = data;
   } else {
     assert(false);
   }
